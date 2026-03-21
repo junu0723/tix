@@ -7,6 +7,10 @@ from relay.linear import create_issue as linear_create
 from relay.github import create_issue as github_create
 from relay.history import add_entry, get_entries, update_entry
 from relay.config import LINEAR_API_KEY, LINEAR_TEAM_ID, GITHUB_TOKEN, GITHUB_REPO
+from relay.projects import (
+    create_project, get_project, list_projects, delete_project,
+    set_active_project, get_active_project, get_active_project_name,
+)
 
 ENV_FILE = Path.cwd() / ".env"
 GLOBAL_ENV = Path.home() / ".relay-cli" / ".env"
@@ -15,17 +19,20 @@ PRIORITY_LABELS = {1: "Urgent", 2: "High", 3: "Medium", 4: "Low"}
 PRIORITY_COLORS = {1: "red", 2: "yellow", 3: "blue", 4: "white"}
 
 
-TARGETS = {
-    "linear": linear_create,
-    "github": github_create,
-}
+def _resolve_project():
+    """Get active project config, or None."""
+    return get_active_project()
 
 
-def _create_issue(ticket, target="linear"):
-    fn = TARGETS.get(target)
-    if not fn:
+def _create_issue(ticket, target="linear", project=None):
+    if target == "linear":
+        team_id = (project or {}).get("linear_team_id")
+        return linear_create(ticket, team_id=team_id)
+    elif target == "github":
+        repo = (project or {}).get("github_repo")
+        return github_create(ticket, repo=repo)
+    else:
         _error(f"Unknown target '{target}'. Choose: linear, github")
-    return fn(ticket)
 
 
 def _output(data, pretty=False):
@@ -185,10 +192,11 @@ def status():
             "local": str(ENV_FILE) if local_env else None,
             "global": str(GLOBAL_ENV) if global_env else None,
         },
+        "active_project": get_active_project_name(),
         "ready": {
             "parse": bool(claude_path),
             "linear": bool(LINEAR_API_KEY and LINEAR_TEAM_ID),
-            "github": bool(GITHUB_TOKEN and GITHUB_REPO),
+            "github": bool(GITHUB_TOKEN or shutil.which("gh")),
         },
     }, pretty=True)
 
@@ -263,21 +271,27 @@ def parse(file, text, push, target, pretty, human):
     tickets = parse_transcript(transcript)
     add_entry(tickets, source=source)
 
+    proj = _resolve_project()
+    if proj:
+        click.echo(f"Using project: {proj['name']}", err=True)
+
     if human:
         _print_tickets_human(tickets)
         if push:
             click.confirm(f"Create these issues in {target}?", abort=True)
-            _push_tickets_human(tickets, target)
+            _push_tickets_human(tickets, target, proj)
         else:
             click.echo("Use --push to create issues.", err=True)
         return
 
     result = {"tickets": tickets, "count": len(tickets), "source": source, "target": target}
+    if proj:
+        result["project"] = proj["name"]
 
     if push:
         created = []
         for t in tickets:
-            issue = _create_issue(t, target)
+            issue = _create_issue(t, target, proj)
             t["issueId"] = issue["id"]
             t["issueUrl"] = issue["url"]
             created.append(issue)
@@ -358,9 +372,10 @@ def create(input, title, description, priority, labels, target, pretty):
         else:
             _error("Expected a JSON array or object.")
 
+    proj = _resolve_project()
     created = []
     for t in ticket_list:
-        issue = _create_issue(t, target)
+        issue = _create_issue(t, target, proj)
         created.append(issue)
         click.echo(f"Created {issue['id']}: {issue['title']}", err=True)
 
@@ -464,6 +479,135 @@ def history_clear(yes):
     _output({"ok": True, "message": "History cleared."})
 
 
+# ── project ────────────────────────────────────────────────────────────
+
+@cli.group()
+def project():
+    """Manage projects with per-project output targets.
+
+    \b
+    Projects let you define where issues go (which GitHub repo,
+    which Linear team) so you can switch between projects easily.
+
+    \b
+    Auth credentials (API keys, tokens) are global.
+    Projects only store target-specific config like repo and team ID.
+
+    \b
+    Subcommands:
+      create  Create a new project
+      list    List all projects
+      use     Set the active project
+      show    Show project details
+      delete  Delete a project
+    """
+    pass
+
+
+@project.command("create")
+@click.argument("name")
+@click.option("--github-repo", default=None, help="GitHub repo (owner/repo).")
+@click.option("--linear-team-id", default=None, help="Linear team UUID.")
+@click.option("--pretty", is_flag=True, help="Pretty-print JSON output.")
+def project_create(name, github_repo, linear_team_id, pretty):
+    """Create a new project.
+
+    \b
+    Examples:
+      relay project create webapp --github-repo owner/webapp --linear-team-id uuid
+
+    \b
+      relay project create mobile --github-repo owner/mobile-app
+
+    \b
+      # GitHub repo auto-detected from current directory
+      relay project create myproject
+    """
+    from relay.github import _detect_repo
+
+    config = {}
+    if github_repo:
+        config["github_repo"] = github_repo
+    elif _detect_repo():
+        config["github_repo"] = _detect_repo()
+        click.echo(f"Auto-detected GitHub repo: {config['github_repo']}", err=True)
+    if linear_team_id:
+        config["linear_team_id"] = linear_team_id
+    elif LINEAR_TEAM_ID:
+        config["linear_team_id"] = LINEAR_TEAM_ID
+        click.echo(f"Using default Linear team: {LINEAR_TEAM_ID}", err=True)
+
+    result = create_project(name, config)
+    _output(result, pretty=pretty)
+
+
+@project.command("list")
+@click.option("--pretty", is_flag=True, help="Pretty-print JSON output.")
+def project_list(pretty):
+    """List all projects.
+
+    \b
+    Example:
+      relay project list --pretty
+    """
+    projects = list_projects()
+    _output({"projects": projects, "count": len(projects)}, pretty=pretty)
+
+
+@project.command("use")
+@click.argument("name")
+def project_use(name):
+    """Set the active project.
+
+    \b
+    Example:
+      relay project use webapp
+    """
+    set_active_project(name)
+    proj = get_project(name)
+    _output({"ok": True, "active": name, **proj})
+
+
+@project.command("show")
+@click.argument("name", default=None, required=False)
+@click.option("--pretty", is_flag=True, help="Pretty-print JSON output.")
+def project_show(name, pretty):
+    """Show project details. Defaults to active project.
+
+    \b
+    Example:
+      relay project show
+      relay project show webapp --pretty
+    """
+    if not name:
+        name = get_active_project_name()
+    if not name:
+        _error("No active project. Use 'relay project use <name>' or specify a name.")
+    proj = get_project(name)
+    if not proj:
+        _error(f"Project '{name}' not found.")
+    proj["active"] = name == get_active_project_name()
+    _output(proj, pretty=pretty)
+
+
+@project.command("delete")
+@click.argument("name")
+@click.option("--yes", is_flag=True, help="Skip confirmation.")
+def project_delete(name, yes):
+    """Delete a project.
+
+    \b
+    Example:
+      relay project delete old-project --yes
+    """
+    if not yes:
+        click.confirm(f"Delete project '{name}'?", abort=True)
+    if delete_project(name):
+        _output({"ok": True, "deleted": name})
+    else:
+        _error(f"Project '{name}' not found.")
+
+
 # ── dashboard ──────────────────────────────────────────────────────────
 
 @cli.command()
@@ -503,9 +647,9 @@ def _print_tickets_human(tickets):
         click.echo()
 
 
-def _push_tickets_human(tickets, target="linear"):
+def _push_tickets_human(tickets, target="linear", project=None):
     for t in tickets:
-        result = _create_issue(t, target)
+        result = _create_issue(t, target, project)
         click.echo(click.style(f"  Created {result['id']}", fg="green") + f" — {result['title']}")
         click.echo(click.style(f"  {result['url']}", dim=True))
 

@@ -18,15 +18,16 @@ mutation CreateIssue($input: IssueCreateInput!) {
 """
 
 
-def create_issue(ticket: dict) -> dict:
+def create_issue(ticket: dict, team_id: str = None) -> dict:
     if not LINEAR_API_KEY:
         raise RuntimeError("LINEAR_API_KEY is not set. Check your .env file.")
-    if not LINEAR_TEAM_ID:
+    team = team_id or LINEAR_TEAM_ID
+    if not team:
         raise RuntimeError("LINEAR_TEAM_ID is not set. Check your .env file.")
 
     variables = {
         "input": {
-            "teamId": LINEAR_TEAM_ID,
+            "teamId": team,
             "title": ticket["title"],
             "description": ticket.get("description", ""),
             "priority": ticket.get("priority", 3),

@@ -17,6 +17,10 @@ pip install git+https://github.com/junu0723/relay-cli.git
 - Python 3.11+
 - [Claude Code CLI](https://github.com/anthropics/claude-code) installed and authenticated
 
+### Optional (auto-detected)
+
+- [GitHub CLI (`gh`)](https://cli.github.com/) — if installed, GitHub issues work without a token
+
 ## Setup
 
 ```bash
@@ -26,7 +30,7 @@ relay setup
 # Linear only
 relay setup --linear-api-key lin_api_xxx --linear-team-id your-team-uuid
 
-# GitHub only
+# GitHub only (or skip if you have gh CLI)
 relay setup --github-token ghp_xxx --github-repo owner/repo
 
 # Both, saved globally (~/.relay-cli/.env)
@@ -40,6 +44,31 @@ Check your configuration:
 ```bash
 relay status
 ```
+
+## Projects
+
+Projects let you manage multiple output targets (different repos, teams) and switch between them.
+
+```bash
+# Create a project (auto-detects GitHub repo and Linear team from env)
+relay project create webapp
+relay project create webapp --github-repo owner/webapp --linear-team-id uuid
+
+# List all projects
+relay project list --pretty
+
+# Switch active project
+relay project use webapp
+
+# Show project details
+relay project show
+relay project show webapp --pretty
+
+# Delete a project
+relay project delete old-project --yes
+```
+
+When a project is active, `relay parse --push` and `relay create` automatically use that project's config.
 
 ## CLI Usage
 
@@ -122,15 +151,27 @@ Features:
 
 ## Configuration
 
+### Integration backends
+
+Each integration supports multiple backends (auto-selected):
+
+| Integration | CLI backend | API backend |
+|------------|-------------|-------------|
+| Claude (parsing) | `claude` CLI (Claude Code) | — |
+| GitHub (issues) | `gh` CLI (auto-detected) | REST API via `GITHUB_TOKEN` |
+| Linear (issues) | — | GraphQL API via `LINEAR_API_KEY` |
+
+### Environment variables
+
 | Variable | Required for | Description |
 |----------|-------------|-------------|
 | `LINEAR_API_KEY` | Linear issues | [Linear API key](https://linear.app/settings/account/security) |
-| `LINEAR_TEAM_ID` | Linear issues | Linear team UUID |
-| `GITHUB_TOKEN` | GitHub issues | [GitHub personal access token](https://github.com/settings/tokens) |
-| `GITHUB_REPO` | GitHub issues | Repository in `owner/repo` format |
+| `LINEAR_TEAM_ID` | Linear issues | Linear team UUID (or set per-project) |
+| `GITHUB_TOKEN` | GitHub issues (API) | [GitHub token](https://github.com/settings/tokens) (not needed if `gh` CLI is installed) |
+| `GITHUB_REPO` | GitHub issues | `owner/repo` format (or set per-project, or auto-detected) |
 
-Transcript parsing uses Claude Code CLI — no additional API key needed.
 Credentials are loaded from `.env` (local) or `~/.relay-cli/.env` (global).
+Per-project targets are stored in `~/.relay-cli/projects/`.
 
 ## Uninstall
 
@@ -138,7 +179,7 @@ Credentials are loaded from `.env` (local) or `~/.relay-cli/.env` (global).
 pip uninstall relay-cli
 ```
 
-To also remove config and history:
+To also remove config, projects, and history:
 
 ```bash
 rm -rf ~/.relay-cli
