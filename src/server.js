@@ -1,0 +1,92 @@
+import express from 'express';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { parseTranscript } from './parser.js';
+import { createIssue as linearCreate, getTeamName } from './linear.js';
+import { createIssue as githubCreate } from './github.js';
+import { addEntry, getEntries, updateEntry } from './history.js';
+import { listProjects, getProject, setActiveProject, getActiveProjectName } from './projects.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const STATIC_DIR = join(__dirname, '..', 'static');
+
+const TARGETS = { linear: linearCreate, github: githubCreate };
+
+export function startServer(host = '127.0.0.1', port = 8000) {
+  const app = express();
+  app.use(express.json());
+
+  app.get('/', (req, res) => {
+    res.type('html').send(readFileSync(join(STATIC_DIR, 'index.html'), 'utf8'));
+  });
+
+  app.post('/api/parse', async (req, res) => {
+    try {
+      const tickets = parseTranscript(req.body.transcript);
+      addEntry(tickets, 'dashboard');
+      res.json({ tickets });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/history', (req, res) => {
+    res.json({ entries: getEntries() });
+  });
+
+  app.post('/api/history/update', (req, res) => {
+    try {
+      updateEntry(req.body.index, req.body.tickets);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/create', async (req, res) => {
+    try {
+      const { ticket, target = 'linear', project: projectName } = req.body;
+      const fn = TARGETS[target];
+      if (!fn) return res.status(400).json({ error: `Unknown target: ${target}` });
+
+      const kwargs = {};
+      if (projectName) {
+        const proj = getProject(projectName);
+        if (proj) {
+          if (target === 'github') kwargs.repo = proj.github_repo;
+          else if (target === 'linear') kwargs.teamId = proj.linear_team_id;
+        }
+      }
+
+      const result = await fn(ticket, kwargs.repo || kwargs.teamId || undefined);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/projects', async (req, res) => {
+    const projects = listProjects();
+    for (const p of projects) {
+      if (p.linear_team_id) {
+        const name = await getTeamName(p.linear_team_id);
+        if (name) p.linear_team_name = name;
+      }
+    }
+    res.json({ projects, active: getActiveProjectName() });
+  });
+
+  app.post('/api/projects/use', (req, res) => {
+    try {
+      setActiveProject(req.body.name);
+      res.json({ ok: true, active: req.body.name });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.listen(port, host, () => {
+    console.error(`Starting dashboard at http://${host}:${port}`);
+  });
+}

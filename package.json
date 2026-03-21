@@ -1,0 +1,37 @@
+{
+  "name": "@junu0723/relay",
+  "version": "0.1.0",
+  "description": "Convert meeting/call transcripts into Linear or GitHub issues using Claude AI",
+  "type": "module",
+  "bin": {
+    "relay": "./bin/relay.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "static/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.4.0",
+    "commander": "^13.0.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/junu0723/relay-cli.git"
+  },
+  "keywords": [
+    "transcript",
+    "linear",
+    "github",
+    "issues",
+    "claude",
+    "ai",
+    "meeting"
+  ]
+}

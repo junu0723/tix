@@ -1,4 +1,4 @@
-# relay-cli
+# @junu0723/relay
 
 A tool that analyzes meeting/call transcripts with AI and automatically converts them into Linear or GitHub issues.
 
@@ -9,21 +9,17 @@ Transcript → Claude AI (parse into tickets) → Linear / GitHub (create issues
 ## Install
 
 ```bash
-# Recommended (manages its own venv automatically)
-pipx install git+https://github.com/junu0723/relay-cli.git
+# Global install (recommended)
+npm install -g @junu0723/relay
+relay --help
 
-# Or with uv
-uv tool install git+https://github.com/junu0723/relay-cli.git
-
-# Or with pip (inside a venv)
-pip install git+https://github.com/junu0723/relay-cli.git
+# Or run without installing
+npx @junu0723/relay parse meeting.txt
 ```
-
-If you don't have `pipx` yet: `brew install pipx` (macOS) or `apt install pipx` (Linux).
 
 ### Prerequisites
 
-- Python 3.11+
+- Node.js 18+
 - [Claude Code CLI](https://github.com/anthropics/claude-code) installed and authenticated
 
 ### Optional (auto-detected)
@@ -42,10 +38,8 @@ relay setup --linear-api-key lin_api_xxx --linear-team-id your-team-uuid
 # GitHub only (or skip if you have gh CLI)
 relay setup --github-token ghp_xxx --github-repo owner/repo
 
-# Both, saved globally (~/.relay-cli/.env)
-relay setup --global \
-  --linear-api-key lin_api_xxx --linear-team-id uuid \
-  --github-token ghp_xxx --github-repo owner/repo
+# Save globally (~/.relay-cli/.env)
+relay setup --global --linear-api-key lin_api_xxx --linear-team-id uuid
 ```
 
 Check your configuration:
@@ -59,25 +53,16 @@ relay status
 Projects let you manage multiple output targets (different repos, teams) and switch between them.
 
 ```bash
-# Create a project (auto-detects GitHub repo and Linear team from env)
+# Create a project (auto-detects GitHub repo and Linear team)
 relay project create webapp
 relay project create webapp --github-repo owner/webapp --linear-team-id uuid
 
-# List all projects
+# List / switch / show / delete
 relay project list --pretty
-
-# Switch active project
 relay project use webapp
-
-# Show project details
-relay project show
-relay project show webapp --pretty
-
-# Delete a project
+relay project show --pretty
 relay project delete old-project --yes
 ```
-
-When a project is active, `relay parse --push` and `relay create` automatically use that project's config.
 
 ## CLI Usage
 
@@ -87,58 +72,29 @@ Use `--target linear` (default) or `--target github` to choose where issues are 
 ### Parse transcripts
 
 ```bash
-# From file
 relay parse meeting.txt
-
-# From stdin
 cat meeting.txt | relay parse
-
-# Direct text input
-relay parse --text "We need to fix the login bug by Friday"
-
-# Parse and create in Linear
+relay parse --text "Fix the login bug by Friday"
 relay parse meeting.txt --push
-
-# Parse and create as GitHub issues
 relay parse meeting.txt --push --target github
-
-# Pretty-print JSON
 relay parse meeting.txt --pretty
-
-# Human-readable output
 relay parse meeting.txt --human
 ```
 
 ### Create issues
 
 ```bash
-# Pipe from parse output
 relay parse meeting.txt | jq '.tickets' | relay create
-
-# Create as GitHub issues
-relay parse meeting.txt | jq '.tickets' | relay create --target github
-
-# From a JSON file
 relay create tickets.json
-
-# Single ticket with flags
-relay create --title "Fix login bug" --description "Session expires" --priority 2 --labels "bug,backend"
-
-# Single ticket via stdin
+relay create --title "Fix login bug" --description "Session expires" --priority 2
 echo '{"title":"Fix bug","priority":1}' | relay create --target github
 ```
 
 ### History
 
 ```bash
-# List recent entries
-relay history list
-relay history list --limit 5 --pretty
-
-# Get full details of an entry
+relay history list --pretty
 relay history get 0 --pretty
-
-# Clear all history
 relay history clear --yes
 ```
 
@@ -146,27 +102,22 @@ relay history clear --yes
 
 ```bash
 relay dashboard
-# opens http://127.0.0.1:8000
-
 relay dashboard --port 3000
-relay dashboard --host 0.0.0.0 --port 8080
 ```
 
 Features:
 - Paste or upload transcript files (.txt, .md, .srt, .vtt)
-- Edit tickets (title, description, priority, labels) before creating
-- Create issues in Linear individually or in bulk
+- Edit tickets before creating
+- Project and target selection
 - History with creation status tracking
 
 ## Configuration
 
 ### Integration backends
 
-Each integration supports multiple backends (auto-selected):
-
 | Integration | CLI backend | API backend |
 |------------|-------------|-------------|
-| Claude (parsing) | `claude` CLI (Claude Code) | — |
+| Claude (parsing) | `claude` CLI | — |
 | GitHub (issues) | `gh` CLI (auto-detected) | REST API via `GITHUB_TOKEN` |
 | Linear (issues) | — | GraphQL API via `LINEAR_API_KEY` |
 
@@ -179,14 +130,10 @@ Each integration supports multiple backends (auto-selected):
 | `GITHUB_TOKEN` | GitHub issues (API) | [GitHub token](https://github.com/settings/tokens) (not needed if `gh` CLI is installed) |
 | `GITHUB_REPO` | GitHub issues | `owner/repo` format (or set per-project, or auto-detected) |
 
-Credentials are loaded from `.env` (local) or `~/.relay-cli/.env` (global).
-Per-project targets are stored in `~/.relay-cli/projects/`.
-
 ## Uninstall
 
 ```bash
-pipx uninstall relay-cli
-# or: pip uninstall relay-cli
+npm uninstall -g @junu0723/relay
 ```
 
 To also remove config, projects, and history:
@@ -200,10 +147,9 @@ rm -rf ~/.relay-cli
 ```bash
 git clone https://github.com/junu0723/relay-cli.git
 cd relay-cli
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-relay status
-relay dashboard
+npm install
+node bin/relay.js --help
+node bin/relay.js dashboard
 ```
 
 ## License
