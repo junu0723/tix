@@ -1,0 +1,55 @@
+node bin/tix.js parse --text '맞아요. UI는 있는 것만으로도 충분해요.
+
+지금 tix의 진짜 가치는 CLI + SKILL.md 쪽이에요. 정리하면:
+
+**이미 잘 된 것:**
+```
+tix parse notes.txt --push        # 파일 → Linear/GitHub
+tix project use relay-cli         # 프로젝트 컨텍스트
+GitHub 중복 이슈 자동 체크
+SSE 스트리밍 (토큰/비용 추적)
+tix/SKILL.md (Claude Code에서 사용 가능)
+```
+
+**진짜 다음 단계로 의미 있는 것:**
+
+```
+1. tix/SKILL.md을 Claude Code에 실제 등록해서
+   ezq-workspace 안에서
+   "이 QA 피드백을 티켓으로 만들어줘" → Claude가 tix 실행
+   → 오늘 대화에서 얘기한 ezq-feature-intake랑 연결되는 지점
+
+2. ezq-workspace project 등록
+   tix project create ezq-workspace \
+     --github-repo junu0723/ezq-workspace \
+     --description "..." \
+     --stack "Spring Boot, React..."
+   → ROADMAP.md + GitHub Issues 컨텍스트 자동 로드
+
+3. 이 대화 내용을 실제로 tix에 넣어보기
+   지금 이 대화를 복사해서 tix parse 돌려보면
+   relay-cli 할 일들이 Linear ticket으로 생성되는
+   진짜 dog fooding
+```
+
+지금 당장 3번 해볼 수 있어요. 이 대화 내용 텍스트로 저장해서 `tix parse --push` 돌리면 오늘 나온 아이디어들이 Linear에 들어가요.
+
+해볼까요, 아니면 SKILL.md를 ezq-workspace에 실제 연결하는 거 먼저 할까요?'
+Using project: tix
+Analyzing...
+<anonymous_script>:10
+    "description": "Create a tix project for ezq-workspace with GitHub repo, description, and tech stack so that tix can auto-load ROADMAP.md and GitHub Issues context when generating tickets.\n\n### Command\n
+
+SyntaxError: Unterminated string in JSON at position 1089 (line 10 column 210)
+    at JSON.parse (<anonymous>)
+    at extractTickets (file:///Users/junu/dev/relay-cli/src/parser.js:114:15)
+    at parseTranscript (file:///Users/junu/dev/relay-cli/src/parser.js:127:19)
+    at Command.<anonymous> (file:///Users/junu/dev/relay-cli/src/cli.js:233:32)
+    at Command.listener [as _actionHandler] (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:552:17)
+    at /Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1586:14
+    at Command._chainOrCall (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1470:12)
+    at Command._parseCommand (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1585:27)
+    at /Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1349:27
+    at Command._chainOrCall (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1470:12)
+
+Node.js v25.8.1
