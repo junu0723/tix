@@ -71,17 +71,25 @@ async function confirm(question) {
 
 program
   .name('relay')
-  .description('relay — Convert meeting/call transcripts into Linear or GitHub issues.')
+  .description('relay — AI-powered CLI that turns any text into actionable tickets.\n\nDesigned for AI agents. All commands output JSON to stdout, status to stderr.\nSupports Linear and GitHub as output targets.\n\nQuick start:\n  relay setup --linear-api-key KEY --linear-team-id ID\n  relay project create my-project\n  relay parse meeting.txt --pretty\n  relay parse meeting.txt --push')
   .version('0.1.0');
 
 program
   .command('setup')
   .description('Configure API credentials for Linear and/or GitHub.')
-  .option('--linear-api-key <key>', 'Linear API key')
+  .option('--linear-api-key <key>', 'Linear API key (lin_api_...)')
   .option('--linear-team-id <id>', 'Linear team UUID')
-  .option('--github-token <token>', 'GitHub personal access token')
-  .option('--github-repo <repo>', 'GitHub repo (owner/repo)')
-  .option('--global', 'Save to ~/.relay-cli/.env')
+  .option('--github-token <token>', 'GitHub personal access token (ghp_...)')
+  .option('--github-repo <repo>', 'GitHub repo in owner/repo format')
+  .option('--global', 'Save to ~/.relay-cli/.env instead of ./.env')
+  .addHelpText('after', `
+Examples:
+  relay setup                                              # interactive prompts
+  relay setup --linear-api-key lin_api_xxx --linear-team-id uuid  # non-interactive
+  relay setup --github-token ghp_xxx --github-repo owner/repo
+  relay setup --global --linear-api-key lin_api_xxx        # save globally
+
+Output: { "ok": true, "file": "...", "linear_api_key": "lin_api_...", ... }`)
   .action(async (opts) => {
     const target = opts.global ? GLOBAL_ENV : ENV_FILE;
     const existing = {};
@@ -125,7 +133,24 @@ program
 
 program
   .command('status')
-  .description('Show current configuration and connection status.')
+  .description('Show current configuration, detected CLIs, and readiness.')
+  .addHelpText('after', `
+Example:
+  relay status
+
+Output:
+  {
+    "linear_api_key": "lin_api_...",
+    "linear_team_id": "uuid",
+    "github_token": null,
+    "github_repo": null,
+    "claude_cli": "/path/to/claude",
+    "lin_cli": "/path/to/lin",
+    "gh_cli": "/path/to/gh",
+    "gws_cli": "/path/to/gws",
+    "active_project": "my-project",
+    "ready": { "parse": true, "linear": true, "github": true, "google": true }
+  }`)
   .action(() => {
     let claudePath = null;
     try { claudePath = execFileSync('which', ['claude'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch {}
@@ -166,12 +191,43 @@ program
 
 program
   .command('parse [file]')
-  .description('Parse a transcript into tickets.')
-  .option('--text <text>', 'Pass transcript text directly')
-  .option('--push', 'Create issues immediately after parsing')
-  .option('--target <target>', 'Target platform: linear or github', 'linear')
-  .option('--pretty', 'Pretty-print JSON output')
-  .option('--human', 'Human-readable output')
+  .description('Parse any text into actionable tickets using Claude AI.')
+  .option('--text <text>', 'Pass text directly as a string instead of file/stdin')
+  .option('--push', 'Create issues in target platform immediately after parsing')
+  .option('--target <target>', 'Target platform: linear or github (default: linear)', 'linear')
+  .option('--pretty', 'Pretty-print JSON output with indentation')
+  .option('--human', 'Human-readable colored output instead of JSON')
+  .addHelpText('after', `
+Input: Text from file, stdin, or --text flag. Accepts any format:
+  transcripts, notes, to-do lists, braindumps, docs, CSV data, etc.
+
+Examples:
+  relay parse meeting.txt                        # from file
+  relay parse meeting.txt --pretty               # pretty JSON
+  relay parse --text "Fix login bug by Friday"   # inline text
+  cat notes.md | relay parse                     # from stdin
+  relay parse meeting.txt --push                 # parse + create in Linear
+  relay parse meeting.txt --push --target github # parse + create in GitHub
+  relay parse meeting.txt --human                # colored human output
+
+Output (JSON to stdout):
+  {
+    "tickets": [
+      { "title": "...", "description": "...", "priority": 1, "labels": ["bug"] }
+    ],
+    "count": 3,
+    "source": "meeting.txt",
+    "target": "linear",
+    "project": "my-project"
+  }
+
+With --push, adds "created" array:
+  { ..., "created": [{ "id": "ENG-42", "title": "...", "url": "..." }] }
+
+Notes:
+  - If a project is active, its context (description, stack, philosophy)
+    and existing GitHub issues are injected for smarter ticket generation.
+  - Priority: 1=Urgent, 2=High, 3=Medium, 4=Low`)
   .action(async (file, opts) => {
     const transcript = opts.text ? opts.text.trim() : readInput(file).trim();
     if (!transcript) error('Empty transcript. Provide a file, stdin, or --text.');
@@ -217,13 +273,34 @@ program
 
 program
   .command('create [input]')
-  .description('Create issues in Linear or GitHub from JSON or flags.')
-  .option('--title <title>', 'Ticket title')
+  .description('Create issues in Linear or GitHub from JSON input or flags.')
+  .option('--title <title>', 'Ticket title (for single-ticket creation without JSON)')
   .option('--description <desc>', 'Ticket description')
-  .option('--priority <n>', 'Priority 1-4', parseInt)
-  .option('--labels <labels>', 'Comma-separated labels')
-  .option('--target <target>', 'Target platform: linear or github', 'linear')
+  .option('--priority <n>', 'Priority 1-4 (1=Urgent, 2=High, 3=Medium, 4=Low)', parseInt)
+  .option('--labels <labels>', 'Comma-separated labels (e.g. "bug,frontend")')
+  .option('--target <target>', 'Target platform: linear or github (default: linear)', 'linear')
   .option('--pretty', 'Pretty-print JSON output')
+  .addHelpText('after', `
+Input: JSON via stdin, file, or --title flag. Accepts:
+  - JSON array of tickets: [{"title":"...","priority":1}, ...]
+  - JSON object with tickets key: {"tickets":[...]}
+  - Single ticket object: {"title":"...","priority":1}
+  - Flags: --title "..." --priority 2 --labels "bug"
+
+Examples:
+  relay parse notes.txt | jq '.tickets' | relay create        # pipe from parse
+  relay create tickets.json                                    # from JSON file
+  relay create --title "Fix bug" --priority 2 --labels "bug"   # from flags
+  relay create --target github                                 # target GitHub
+  echo '[{"title":"A"},{"title":"B"}]' | relay create          # batch create
+
+Output (JSON to stdout):
+  {
+    "created": [
+      { "id": "ENG-42", "title": "Fix bug", "url": "https://..." }
+    ],
+    "count": 1
+  }`)
   .action(async (input, opts) => {
     let ticketList;
 
@@ -257,13 +334,27 @@ program
 
 // ── history ────────────────────────────────────────────────────────────
 
-const history = program.command('history').description('View and manage parsing history.');
+const history = program.command('history').description('View and manage parsing history.\n\nHistory is stored at ~/.relay-cli/history.json.\nEach entry records timestamp, source, and parsed tickets.');
 
 history
   .command('list')
-  .description('List recent parsing history.')
-  .option('--limit <n>', 'Max entries', parseInt, 20)
+  .description('List recent parsing history entries.')
+  .option('--limit <n>', 'Max entries to return (default: 20)', parseInt, 20)
   .option('--pretty', 'Pretty-print JSON output')
+  .addHelpText('after', `
+Examples:
+  relay history list                # list recent entries
+  relay history list --limit 5     # last 5 entries
+  relay history list --pretty      # pretty JSON
+
+Output:
+  {
+    "entries": [
+      { "index": 0, "timestamp": "...", "source": "meeting.txt",
+        "ticket_count": 5, "created_count": 3 }
+    ],
+    "total": 10
+  }`)
   .action((opts) => {
     const entries = getEntries();
     const summary = entries.slice(0, opts.limit).map((e, i) => ({
@@ -278,8 +369,14 @@ history
 
 history
   .command('get <index>')
-  .description('Get full details of a history entry.')
+  .description('Get full details of a history entry by index.')
   .option('--pretty', 'Pretty-print JSON output')
+  .addHelpText('after', `
+Examples:
+  relay history get 0              # most recent entry
+  relay history get 2 --pretty     # entry at index 2
+
+Output: Full entry with timestamp, source, and all ticket data.`)
   .action((index, opts) => {
     const entries = getEntries();
     const i = parseInt(index);
@@ -299,18 +396,32 @@ history
 
 // ── project ────────────────────────────────────────────────────────────
 
-const project = program.command('project').description('Manage projects with per-project output targets.');
+const project = program.command('project').description('Manage projects with per-project output targets and context.\n\nEach project stores: output targets (github_repo, linear_team_id) and\ncontext (description, stack, status, philosophy) used during parsing.\nWhen active, context is injected into Claude prompt for smarter tickets.\nStored at ~/.relay-cli/projects/.');
 
 project
   .command('create <name>')
-  .description('Create a new project.')
-  .option('--github-repo <repo>', 'GitHub repo (owner/repo)')
+  .description('Create a new project with output targets and context.')
+  .option('--github-repo <repo>', 'GitHub repo in owner/repo format')
   .option('--linear-team-id <id>', 'Linear team UUID')
-  .option('--description <desc>', 'Project description')
-  .option('--stack <stack>', 'Tech stack')
-  .option('--status <status>', 'Current project status')
-  .option('--philosophy <text>', 'Project philosophy or principles')
+  .option('--description <desc>', 'What this project does')
+  .option('--stack <stack>', 'Tech stack (e.g. "Node.js, React, PostgreSQL")')
+  .option('--status <status>', 'Current project status (e.g. "MVP done, working on v2")')
+  .option('--philosophy <text>', 'Project principles (e.g. "Keep it simple, no over-engineering")')
   .option('--pretty', 'Pretty-print JSON output')
+  .addHelpText('after', `
+Examples:
+  relay project create my-app                                     # auto-detect repo/team
+  relay project create my-app --github-repo owner/repo
+  relay project create my-app --description "E-commerce platform" \\
+    --stack "Next.js, Prisma, PostgreSQL" \\
+    --status "Beta launch next month" \\
+    --philosophy "Ship fast, fix later"
+
+Output: { "name": "my-app", "github_repo": "...", "description": "...", ... }
+
+Notes:
+  - GitHub repo auto-detected from git remote if not specified
+  - Linear team auto-detected from LINEAR_TEAM_ID env var`)
   .action((name, opts) => {
     const config = {};
     if (opts.githubRepo) {
@@ -337,14 +448,19 @@ project
 
 project
   .command('update <name>')
-  .description('Update a project\'s context and settings.')
-  .option('--github-repo <repo>', 'GitHub repo')
+  .description('Update an existing project\'s targets or context.')
+  .option('--github-repo <repo>', 'GitHub repo in owner/repo format')
   .option('--linear-team-id <id>', 'Linear team UUID')
-  .option('--description <desc>', 'Project description')
+  .option('--description <desc>', 'What this project does')
   .option('--stack <stack>', 'Tech stack')
   .option('--status <status>', 'Current project status')
-  .option('--philosophy <text>', 'Project philosophy or principles')
+  .option('--philosophy <text>', 'Project principles')
   .option('--pretty', 'Pretty-print JSON output')
+  .addHelpText('after', `
+Examples:
+  relay project update my-app --status "Launched, collecting feedback"
+  relay project update my-app --philosophy "User experience over features"
+  relay project update my-app --github-repo new-owner/new-repo`)
   .action((name, opts) => {
     const existing = getProject(name);
     if (!existing) error(`Project '${name}' not found.`);
