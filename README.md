@@ -25,6 +25,7 @@ npx @junu0723/relay parse meeting.txt
 ### Optional (auto-detected)
 
 - [GitHub CLI (`gh`)](https://cli.github.com/) — if installed, GitHub issues work without a token
+- [Google Workspace CLI (`gws`)](https://github.com/nicholasgasior/gws) — for importing from Google Docs, Sheets, and Meet
 
 ## Setup
 
@@ -69,17 +70,40 @@ relay project delete old-project --yes
 All commands output structured JSON to stdout. Status messages go to stderr.
 Use `--target linear` (default) or `--target github` to choose where issues are created.
 
-### Parse transcripts
+### Parse any input
+
+Accepts transcripts, notes, to-do lists, braindumps, docs — anything with actionable items.
 
 ```bash
 relay parse meeting.txt
-cat meeting.txt | relay parse
+cat notes.md | relay parse
 relay parse --text "Fix the login bug by Friday"
 relay parse meeting.txt --push
 relay parse meeting.txt --push --target github
 relay parse meeting.txt --pretty
 relay parse meeting.txt --human
 ```
+
+### Fetch from Google Workspace
+
+Requires [gws CLI](https://github.com/nicholasgasior/gws).
+
+```bash
+# Google Doc
+relay fetch doc <docId>
+relay fetch doc <docId> --push --target linear
+
+# Google Sheet
+relay fetch sheet <spreadsheetId>
+relay fetch sheet <spreadsheetId> "Sheet2!A1:D20"
+relay fetch sheet <spreadsheetId> --push --target github
+
+# Google Meet (list recent meetings)
+relay fetch meet --list
+relay fetch meet <conferenceId> --push
+```
+
+Also available in the web dashboard via the "Import from Google" button.
 
 ### Create issues
 
@@ -120,6 +144,7 @@ Features:
 | Claude (parsing) | `claude` CLI | — |
 | GitHub (issues) | `gh` CLI (auto-detected) | REST API via `GITHUB_TOKEN` |
 | Linear (issues) | — | GraphQL API via `LINEAR_API_KEY` |
+| Google Workspace (input) | `gws` CLI | — |
 
 ### Environment variables
 
