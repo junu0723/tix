@@ -1,10 +1,10 @@
 {
-  "name": "@junu0723/relay",
+  "name": "tix-cli",
   "version": "0.1.0",
-  "description": "Convert meeting/call transcripts into Linear or GitHub issues using Claude AI",
+  "description": "AI-powered CLI that turns any text into actionable Linear or GitHub issues",
   "type": "module",
   "bin": {
-    "relay": "./bin/relay.js"
+    "tix": "./bin/tix.js"
   },
   "files": [
     "bin/",
@@ -23,15 +23,20 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/junu0723/relay-cli.git"
+    "url": "https://github.com/junu0723/tix.git"
   },
   "keywords": [
-    "transcript",
+    "tix",
+    "tickets",
     "linear",
     "github",
     "issues",
     "claude",
     "ai",
-    "meeting"
+    "meeting",
+    "transcript",
+    "notes",
+    "automation",
+    "cli"
   ]
 }

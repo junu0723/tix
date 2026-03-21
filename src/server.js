@@ -7,7 +7,6 @@ import { createIssue as linearCreate, getTeamName } from './linear.js';
 import { createIssue as githubCreate } from './github.js';
 import { addEntry, getEntries, updateEntry, deleteEntry } from './history.js';
 import { listProjects, getProject, setActiveProject, getActiveProjectName, createProject as saveProject } from './projects.js';
-import { fetchDoc, fetchSheet, hasGwsCli } from './google.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = join(__dirname, '..', 'static');
@@ -108,31 +107,6 @@ export function startServer(host = '127.0.0.1', port = 8000) {
     }
   });
 
-  app.post('/api/fetch', (req, res) => {
-    try {
-      if (!hasGwsCli()) return res.status(400).json({ error: 'gws CLI not installed.' });
-
-      const { type, id, range } = req.body;
-      let text = '';
-      let source = '';
-
-      if (type === 'doc') {
-        const doc = fetchDoc(id);
-        text = doc.text;
-        source = `gdoc:${id}`;
-      } else if (type === 'sheet') {
-        const sheet = fetchSheet(id, range || null);
-        text = sheet.text;
-        source = `gsheet:${id}`;
-      } else {
-        return res.status(400).json({ error: `Unknown type: ${type}` });
-      }
-
-      res.json({ text, source });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
 
   app.get('/api/projects', async (req, res) => {
     const projects = listProjects();

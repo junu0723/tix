@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>relay-cli</title>
+<title>tix</title>
 <style>
 :root {
   --bg: #0f0f0f;
@@ -142,7 +142,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 </style>
 </head>
 <body>
-<h1 onclick="resetView()">relay-cli</h1>
+<h1 onclick="resetView()">tix</h1>
 <p class="subtitle">AI-powered CLI that turns any text into actionable tickets</p>
 
 <div class="toolbar">
@@ -180,20 +180,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
     <input type="file" id="fileInput" accept=".txt,.md,.srt,.vtt,.csv,.tsv" style="display:none" onchange="loadFile(event)">
     Upload file
   </label>
-  <button class="btn-secondary" onclick="showGoogleImport()" style="font-size:0.9rem">Import from Google</button>
   <span id="fileName" style="color:var(--text-muted);font-size:0.85rem;align-self:center"></span>
-</div>
-<div id="google-import" style="display:none;margin-top:0.75rem;padding:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
-  <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
-    <select id="googleType" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.4rem">
-      <option value="doc">Google Doc</option>
-      <option value="sheet">Google Sheet</option>
-    </select>
-    <input id="googleUrl" class="edit-field" placeholder="Paste Google Doc or Sheet URL" style="flex:1;min-width:200px">
-    <input id="sheetRange" class="edit-field" placeholder="Range (e.g. Sheet1!A1:D20)" style="width:180px;display:none">
-    <button onclick="importFromGoogle()">Import</button>
-  </div>
-  <div id="googleStatus" style="color:var(--text-muted);font-size:0.8rem;margin-top:0.5rem"></div>
 </div>
 
 <div id="loading" class="loading">
@@ -227,51 +214,7 @@ function cancelParse() {
   if (parseAbort) parseAbort.abort();
 }
 
-function showGoogleImport() {
-  const el = document.getElementById('google-import');
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
 
-document.getElementById('googleType')?.addEventListener('change', function() {
-  document.getElementById('sheetRange').style.display = this.value === 'sheet' ? 'block' : 'none';
-});
-
-function extractGoogleId(url) {
-  // Google Doc: /document/d/ID/
-  // Google Sheet: /spreadsheets/d/ID/
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : url.trim();
-}
-
-async function importFromGoogle() {
-  const type = document.getElementById('googleType').value;
-  const url = document.getElementById('googleUrl').value.trim();
-  const range = document.getElementById('sheetRange').value.trim();
-  const status = document.getElementById('googleStatus');
-
-  if (!url) return;
-  const id = extractGoogleId(url);
-  status.textContent = 'Fetching...';
-
-  try {
-    const body = { type, id };
-    if (type === 'sheet' && range) body.range = range;
-
-    const resp = await fetch('/api/fetch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-
-    document.getElementById('transcript').value = data.text;
-    status.textContent = 'Imported! Click Analyze to parse.';
-    document.getElementById('google-import').style.display = 'none';
-  } catch (e) {
-    status.textContent = 'Error: ' + e.message;
-  }
-}
 
 let projectsData = [];
 

@@ -17,7 +17,7 @@ import {
 } from './projects.js';
 
 const ENV_FILE = join(process.cwd(), '.env');
-const GLOBAL_ENV = join(homedir(), '.relay-cli', '.env');
+const GLOBAL_ENV = join(homedir(), '.tix', '.env');
 
 const PRIORITY_LABELS = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
 const PRIORITY_COLORS = { 1: 'red', 2: 'yellow', 3: 'blue', 4: 'white' };
@@ -70,8 +70,8 @@ async function confirm(question) {
 // ── setup ──────────────────────────────────────────────────────────────
 
 program
-  .name('relay')
-  .description('relay — AI-powered CLI that turns any text into actionable tickets.\n\nDesigned for AI agents. All commands output JSON to stdout, status to stderr.\nSupports Linear and GitHub as output targets.\n\nQuick start:\n  relay setup --linear-api-key KEY --linear-team-id ID\n  relay project create my-project\n  relay parse meeting.txt --pretty\n  relay parse meeting.txt --push')
+  .name('tix')
+  .description('tix — AI-powered CLI that turns any text into actionable tickets.\n\nDesigned for AI agents. All commands output JSON to stdout, status to stderr.\nSupports Linear and GitHub as output targets.\n\nQuick start:\n  tix setup --linear-api-key KEY --linear-team-id ID\n  tix project create my-project\n  tix parse meeting.txt --pretty\n  tix parse meeting.txt --push')
   .version('0.1.0');
 
 program
@@ -81,13 +81,13 @@ program
   .option('--linear-team-id <id>', 'Linear team UUID')
   .option('--github-token <token>', 'GitHub personal access token (ghp_...)')
   .option('--github-repo <repo>', 'GitHub repo in owner/repo format')
-  .option('--global', 'Save to ~/.relay-cli/.env instead of ./.env')
+  .option('--global', 'Save to ~/.tix/.env instead of ./.env')
   .addHelpText('after', `
 Examples:
-  relay setup                                              # interactive prompts
-  relay setup --linear-api-key lin_api_xxx --linear-team-id uuid  # non-interactive
-  relay setup --github-token ghp_xxx --github-repo owner/repo
-  relay setup --global --linear-api-key lin_api_xxx        # save globally
+  tix setup                                              # interactive prompts
+  tix setup --linear-api-key lin_api_xxx --linear-team-id uuid  # non-interactive
+  tix setup --github-token ghp_xxx --github-repo owner/repo
+  tix setup --global --linear-api-key lin_api_xxx        # save globally
 
 Output: { "ok": true, "file": "...", "linear_api_key": "lin_api_...", ... }`)
   .action(async (opts) => {
@@ -136,7 +136,7 @@ program
   .description('Show current configuration, detected CLIs, and readiness.')
   .addHelpText('after', `
 Example:
-  relay status
+  tix status
 
 Output:
   {
@@ -147,7 +147,6 @@ Output:
     "claude_cli": "/path/to/claude",
     "lin_cli": "/path/to/lin",
     "gh_cli": "/path/to/gh",
-    "gws_cli": "/path/to/gws",
     "active_project": "my-project",
     "ready": { "parse": true, "linear": true, "github": true, "google": true }
   }`)
@@ -161,9 +160,6 @@ Output:
     let linPath = null;
     try { linPath = execFileSync('which', ['lin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch {}
 
-    let gwsPath = null;
-    try { gwsPath = execFileSync('which', ['gws'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch {}
-
     output({
       linear_api_key: LINEAR_API_KEY ? LINEAR_API_KEY.slice(0, 12) + '...' : null,
       linear_team_id: LINEAR_TEAM_ID || null,
@@ -172,7 +168,6 @@ Output:
       claude_cli: claudePath,
       lin_cli: linPath,
       gh_cli: ghPath,
-      gws_cli: gwsPath,
       env_files: {
         local: existsSync(ENV_FILE) ? ENV_FILE : null,
         global: existsSync(GLOBAL_ENV) ? GLOBAL_ENV : null,
@@ -182,7 +177,6 @@ Output:
         parse: !!claudePath,
         linear: !!(LINEAR_API_KEY && LINEAR_TEAM_ID) || !!linPath,
         github: !!(GITHUB_TOKEN || ghPath),
-        google: !!gwsPath,
       },
     }, true);
   });
@@ -202,13 +196,13 @@ Input: Text from file, stdin, or --text flag. Accepts any format:
   transcripts, notes, to-do lists, braindumps, docs, CSV data, etc.
 
 Examples:
-  relay parse meeting.txt                        # from file
-  relay parse meeting.txt --pretty               # pretty JSON
-  relay parse --text "Fix login bug by Friday"   # inline text
-  cat notes.md | relay parse                     # from stdin
-  relay parse meeting.txt --push                 # parse + create in Linear
-  relay parse meeting.txt --push --target github # parse + create in GitHub
-  relay parse meeting.txt --human                # colored human output
+  tix parse meeting.txt                        # from file
+  tix parse meeting.txt --pretty               # pretty JSON
+  tix parse --text "Fix login bug by Friday"   # inline text
+  cat notes.md | tixparse                     # from stdin
+  tix parse meeting.txt --push                 # parse + create in Linear
+  tix parse meeting.txt --push --target github # parse + create in GitHub
+  tix parse meeting.txt --human                # colored human output
 
 Output (JSON to stdout):
   {
@@ -289,11 +283,11 @@ Input: JSON via stdin, file, or --title flag. Accepts:
   - Flags: --title "..." --priority 2 --labels "bug"
 
 Examples:
-  relay parse notes.txt | jq '.tickets' | relay create        # pipe from parse
-  relay create tickets.json                                    # from JSON file
-  relay create --title "Fix bug" --priority 2 --labels "bug"   # from flags
-  relay create --target github                                 # target GitHub
-  echo '[{"title":"A"},{"title":"B"}]' | relay create          # batch create
+  tix parse notes.txt | jq '.tickets' | tixcreate        # pipe from parse
+  tix create tickets.json                                    # from JSON file
+  tix create --title "Fix bug" --priority 2 --labels "bug"   # from flags
+  tix create --target github                                 # target GitHub
+  echo '[{"title":"A"},{"title":"B"}]' | tixcreate          # batch create
 
 Output (JSON to stdout):
   {
@@ -335,7 +329,7 @@ Output (JSON to stdout):
 
 // ── history ────────────────────────────────────────────────────────────
 
-const history = program.command('history').description('View and manage parsing history.\n\nHistory is stored at ~/.relay-cli/history.json.\nEach entry records timestamp, source, and parsed tickets.');
+const history = program.command('history').description('View and manage parsing history.\n\nHistory is stored at ~/.tix/history.json.\nEach entry records timestamp, source, and parsed tickets.');
 
 history
   .command('list')
@@ -344,9 +338,9 @@ history
   .option('--pretty', 'Pretty-print JSON output')
   .addHelpText('after', `
 Examples:
-  relay history list                # list recent entries
-  relay history list --limit 5     # last 5 entries
-  relay history list --pretty      # pretty JSON
+  tix history list                # list recent entries
+  tix history list --limit 5     # last 5 entries
+  tix history list --pretty      # pretty JSON
 
 Output:
   {
@@ -374,8 +368,8 @@ history
   .option('--pretty', 'Pretty-print JSON output')
   .addHelpText('after', `
 Examples:
-  relay history get 0              # most recent entry
-  relay history get 2 --pretty     # entry at index 2
+  tix history get 0              # most recent entry
+  tix history get 2 --pretty     # entry at index 2
 
 Output: Full entry with timestamp, source, and all ticket data.`)
   .action((index, opts) => {
@@ -397,7 +391,7 @@ history
 
 // ── project ────────────────────────────────────────────────────────────
 
-const project = program.command('project').description('Manage projects with per-project output targets and context.\n\nEach project stores: output targets (github_repo, linear_team_id) and\ncontext (description, stack, status, philosophy) used during parsing.\nWhen active, context is injected into Claude prompt for smarter tickets.\nStored at ~/.relay-cli/projects/.');
+const project = program.command('project').description('Manage projects with per-project output targets and context.\n\nEach project stores: output targets (github_repo, linear_team_id) and\ncontext (description, stack, status, philosophy) used during parsing.\nWhen active, context is injected into Claude prompt for smarter tickets.\nStored at ~/.tix/projects/.');
 
 project
   .command('create <name>')
@@ -411,9 +405,9 @@ project
   .option('--pretty', 'Pretty-print JSON output')
   .addHelpText('after', `
 Examples:
-  relay project create my-app                                     # auto-detect repo/team
-  relay project create my-app --github-repo owner/repo
-  relay project create my-app --description "E-commerce platform" \\
+  tix project create my-app                                     # auto-detect repo/team
+  tix project create my-app --github-repo owner/repo
+  tix project create my-app --description "E-commerce platform" \\
     --stack "Next.js, Prisma, PostgreSQL" \\
     --status "Beta launch next month" \\
     --philosophy "Ship fast, fix later"
@@ -459,9 +453,9 @@ project
   .option('--pretty', 'Pretty-print JSON output')
   .addHelpText('after', `
 Examples:
-  relay project update my-app --status "Launched, collecting feedback"
-  relay project update my-app --philosophy "User experience over features"
-  relay project update my-app --github-repo new-owner/new-repo`)
+  tix project update my-app --status "Launched, collecting feedback"
+  tix project update my-app --philosophy "User experience over features"
+  tix project update my-app --github-repo new-owner/new-repo`)
   .action((name, opts) => {
     const existing = getProject(name);
     if (!existing) error(`Project '${name}' not found.`);
@@ -499,7 +493,7 @@ project
   .option('--pretty', 'Pretty-print JSON output')
   .action((name, opts) => {
     if (!name) name = getActiveProjectName();
-    if (!name) error("No active project. Use 'relay project use <name>' or specify a name.");
+    if (!name) error("No active project. Use 'tix project use <name>' or specify a name.");
     const proj = getProject(name);
     if (!proj) error(`Project '${name}' not found.`);
     proj.active = name === getActiveProjectName();
@@ -516,102 +510,7 @@ project
     else error(`Project '${name}' not found.`);
   });
 
-// ── fetch ──────────────────────────────────────────────────────────────
 
-const fetch = program.command('fetch').description('Fetch content from Google Workspace and parse into tickets.');
-
-fetch
-  .command('doc <docId>')
-  .description('Fetch a Google Doc and parse into tickets.')
-  .option('--push', 'Create issues immediately')
-  .option('--target <target>', 'Target platform', 'linear')
-  .option('--pretty', 'Pretty-print JSON output')
-  .option('--human', 'Human-readable output')
-  .action(async (docId, opts) => {
-    const { fetchDoc } = await import('./google.js');
-    console.error(`Fetching Google Doc...`);
-    const doc = fetchDoc(docId);
-    console.error(`Got: "${doc.title}" (${doc.text.length} chars)`);
-    await parseAndOutput(doc.text, `gdoc:${docId}`, opts);
-  });
-
-fetch
-  .command('sheet <spreadsheetId> [range]')
-  .description('Fetch a Google Sheet and parse into tickets.')
-  .option('--push', 'Create issues immediately')
-  .option('--target <target>', 'Target platform', 'linear')
-  .option('--pretty', 'Pretty-print JSON output')
-  .option('--human', 'Human-readable output')
-  .action(async (spreadsheetId, range, opts) => {
-    const { fetchSheet } = await import('./google.js');
-    console.error(`Fetching Google Sheet...`);
-    const sheet = fetchSheet(spreadsheetId, range || null);
-    console.error(`Got: ${sheet.text.split('\n').length} rows`);
-    await parseAndOutput(sheet.text, `gsheet:${spreadsheetId}`, opts);
-  });
-
-fetch
-  .command('meet [conferenceId]')
-  .description('Fetch a Google Meet transcript and parse into tickets.')
-  .option('--push', 'Create issues immediately')
-  .option('--target <target>', 'Target platform', 'linear')
-  .option('--pretty', 'Pretty-print JSON output')
-  .option('--human', 'Human-readable output')
-  .option('--list', 'List recent meetings instead of fetching')
-  .action(async (conferenceId, opts) => {
-    const { fetchMeetTranscripts, fetchMeetTranscript } = await import('./google.js');
-
-    if (opts.list || !conferenceId) {
-      console.error('Listing recent meetings...');
-      const meetings = fetchMeetTranscripts();
-      output({ meetings, count: meetings.length }, opts.pretty);
-      return;
-    }
-
-    console.error(`Fetching Meet transcript...`);
-    const conferenceName = conferenceId.startsWith('conferenceRecords/')
-      ? conferenceId : `conferenceRecords/${conferenceId}`;
-    const transcript = fetchMeetTranscript(conferenceName);
-    if (!transcript) error('No transcript found for this meeting.');
-    console.error(`Got transcript (${transcript.text.length} chars)`);
-    await parseAndOutput(transcript.text, `meet:${conferenceId}`, opts);
-  });
-
-async function parseAndOutput(text, source, opts) {
-  const proj = getActiveProject();
-  if (proj) console.error(`Using project: ${proj.name}`);
-
-  console.error('Analyzing...');
-  const { tickets, stats } = parseTranscript(text, proj);
-  addEntry(tickets, source);
-  console.error(`Done in ${(stats.duration_ms / 1000).toFixed(1)}s · ${stats.input_tokens + stats.output_tokens} tokens · $${stats.cost_usd.toFixed(4)}`);
-
-  if (opts.human) {
-    printTicketsHuman(tickets);
-    if (opts.push) {
-      await confirm(`Create these issues in ${opts.target}?`);
-      await pushTicketsHuman(tickets, opts.target, proj);
-    }
-    return;
-  }
-
-  const result = { tickets, count: tickets.length, source, target: opts.target, stats };
-  if (proj) result.project = proj.name;
-
-  if (opts.push) {
-    const created = [];
-    for (const t of tickets) {
-      const issue = await createIssue(t, opts.target, proj);
-      t.issueId = issue.id;
-      t.issueUrl = issue.url;
-      created.push(issue);
-      console.error(`Created ${issue.id}`);
-    }
-    result.created = created;
-  }
-
-  output(result, opts.pretty);
-}
 
 // ── dashboard ──────────────────────────────────────────────────────────
 

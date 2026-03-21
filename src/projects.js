@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, readdir
 import { join } from 'path';
 import { homedir } from 'os';
 
-const PROJECTS_DIR = join(homedir(), '.relay-cli', 'projects');
-const ACTIVE_FILE = join(homedir(), '.relay-cli', 'active_project');
+const PROJECTS_DIR = join(homedir(), '.tix', 'projects');
+const ACTIVE_FILE = join(homedir(), '.tix', 'active_project');
 
 function ensureDir() {
   mkdirSync(PROJECTS_DIR, { recursive: true });
@@ -57,7 +57,7 @@ export function setActiveProject(name) {
   if (!existsSync(projectPath(name))) {
     throw new Error(`Project '${name}' does not exist.`);
   }
-  mkdirSync(join(homedir(), '.relay-cli'), { recursive: true });
+  mkdirSync(join(homedir(), '.tix'), { recursive: true });
   writeFileSync(ACTIVE_FILE, name, 'utf8');
 }
 

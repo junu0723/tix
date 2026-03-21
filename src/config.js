@@ -5,7 +5,7 @@ import { homedir } from 'os';
 
 // Load local .env first, then global fallback
 dotenv.config();
-const globalEnv = join(homedir(), '.relay-cli', '.env');
+const globalEnv = join(homedir(), '.tix', '.env');
 if (existsSync(globalEnv)) dotenv.config({ path: globalEnv });
 
 export const LINEAR_API_KEY = process.env.LINEAR_API_KEY || '';

@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from '
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 
-export const HISTORY_FILE = join(homedir(), '.relay-cli', 'history.json');
+export const HISTORY_FILE = join(homedir(), '.tix', 'history.json');
 
 function load() {
   if (!existsSync(HISTORY_FILE)) return [];
