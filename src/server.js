@@ -16,6 +16,10 @@ const TARGETS = { linear: linearCreate, github: githubCreate };
 export function startServer(host = '127.0.0.1', port = 8000) {
   const app = express();
   app.use(express.json());
+  app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
 
   app.get('/', (req, res) => {
     res.type('html').send(readFileSync(join(STATIC_DIR, 'index.html'), 'utf8'));
