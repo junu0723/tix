@@ -159,6 +159,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
       <option value="github">GitHub</option>
     </select>
   </div>
+  <div id="projectInfo" style="color:var(--text-muted);font-size:0.8rem;margin-left:auto"></div>
 </div>
 
 <textarea id="transcript" placeholder="Paste your meeting/call transcript here..."></textarea>
@@ -193,19 +194,23 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 let tickets = [];
 let currentHistoryIndex = 0;
 
+let projectsData = [];
+
 async function loadProjects() {
   try {
     const resp = await fetch('/api/projects');
     const data = await resp.json();
+    projectsData = data.projects || [];
     const sel = document.getElementById('projectSelect');
     sel.innerHTML = '<option value="">(none)</option>';
-    (data.projects || []).forEach(p => {
+    projectsData.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.name;
       opt.textContent = p.name;
       if (p.name === data.active) opt.selected = true;
       sel.appendChild(opt);
     });
+    updateProjectInfo();
   } catch (e) {}
 }
 
@@ -218,6 +223,19 @@ async function switchProject() {
       body: JSON.stringify({ name }),
     });
   }
+  updateProjectInfo();
+}
+
+function updateProjectInfo() {
+  const name = document.getElementById('projectSelect').value;
+  const info = document.getElementById('projectInfo');
+  if (!name) { info.textContent = ''; return; }
+  const proj = projectsData.find(p => p.name === name);
+  if (!proj) { info.textContent = ''; return; }
+  const parts = [];
+  if (proj.github_repo) parts.push('GitHub: ' + proj.github_repo);
+  if (proj.linear_team_id) parts.push('Linear: ' + proj.linear_team_id.slice(0, 8) + '...');
+  info.textContent = parts.join(' | ') || 'No targets configured';
 }
 
 function getTarget() { return document.getElementById('targetSelect').value; }
