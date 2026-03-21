@@ -1,9 +1,9 @@
 # @junu0723/relay
 
-A tool that analyzes meeting/call transcripts with AI and automatically converts them into Linear or GitHub issues.
+AI-powered CLI that turns any text into actionable tickets. Feed it transcripts, notes, braindumps, Google Docs, Sheets — it creates Linear or GitHub issues automatically.
 
 ```
-Transcript → Claude AI (parse into tickets) → Linear / GitHub (create issues) → Human just approves
+Any input → Claude AI (extract tickets) → Linear / GitHub (create issues) → Human just approves
 ```
 
 ## Install
@@ -24,8 +24,9 @@ npx @junu0723/relay parse meeting.txt
 
 ### Optional (auto-detected)
 
-- [GitHub CLI (`gh`)](https://cli.github.com/) — if installed, GitHub issues work without a token
-- [Google Workspace CLI (`gws`)](https://github.com/nicholasgasior/gws) — for importing from Google Docs, Sheets, and Meet
+- [GitHub CLI (`gh`)](https://cli.github.com/) — GitHub issues without a token
+- [Linear CLI (`lin`)](https://www.npmjs.com/package/@linear/cli) — Linear issues without an API key
+- [Google Workspace CLI (`gws`)](https://github.com/nicholasgasior/gws) — import from Google Docs, Sheets, and Meet
 
 ## Setup
 
@@ -143,7 +144,7 @@ Features:
 |------------|-------------|-------------|
 | Claude (parsing) | `claude` CLI | — |
 | GitHub (issues) | `gh` CLI (auto-detected) | REST API via `GITHUB_TOKEN` |
-| Linear (issues) | — | GraphQL API via `LINEAR_API_KEY` |
+| Linear (issues) | `lin` CLI (auto-detected) | GraphQL API via `LINEAR_API_KEY` |
 | Google Workspace (input) | `gws` CLI | — |
 
 ### Environment variables

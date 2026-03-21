@@ -133,12 +133,21 @@ program
     let ghPath = null;
     try { ghPath = execFileSync('which', ['gh'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch {}
 
+    let linPath = null;
+    try { linPath = execFileSync('which', ['lin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch {}
+
+    let gwsPath = null;
+    try { gwsPath = execFileSync('which', ['gws'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch {}
+
     output({
       linear_api_key: LINEAR_API_KEY ? LINEAR_API_KEY.slice(0, 12) + '...' : null,
       linear_team_id: LINEAR_TEAM_ID || null,
       github_token: GITHUB_TOKEN ? GITHUB_TOKEN.slice(0, 12) + '...' : null,
       github_repo: GITHUB_REPO || null,
       claude_cli: claudePath,
+      lin_cli: linPath,
+      gh_cli: ghPath,
+      gws_cli: gwsPath,
       env_files: {
         local: existsSync(ENV_FILE) ? ENV_FILE : null,
         global: existsSync(GLOBAL_ENV) ? GLOBAL_ENV : null,
@@ -146,8 +155,9 @@ program
       active_project: getActiveProjectName(),
       ready: {
         parse: !!claudePath,
-        linear: !!(LINEAR_API_KEY && LINEAR_TEAM_ID),
+        linear: !!(LINEAR_API_KEY && LINEAR_TEAM_ID) || !!linPath,
         github: !!(GITHUB_TOKEN || ghPath),
+        google: !!gwsPath,
       },
     }, true);
   });
