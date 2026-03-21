@@ -3,6 +3,33 @@ import { GITHUB_TOKEN, GITHUB_REPO } from './config.js';
 
 const PRIORITY_LABELS = { 1: 'P1: urgent', 2: 'P2: high', 3: 'P3: medium', 4: 'P4: low' };
 
+export function getOpenIssues(repo = null) {
+  repo = repo || detectRepo();
+  if (!repo || !hasGhCli()) return [];
+  try {
+    const result = execFileSync('gh', [
+      'issue', 'list', '--repo', repo, '--state', 'open',
+      '--json', 'number,title,labels,state', '--limit', '50',
+    ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 });
+    return JSON.parse(result);
+  } catch {
+    return [];
+  }
+}
+
+export function getRepoInfo(repo = null) {
+  repo = repo || detectRepo();
+  if (!repo || !hasGhCli()) return null;
+  try {
+    const result = execFileSync('gh', [
+      'repo', 'view', repo, '--json', 'name,description,primaryLanguage,languages',
+    ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 });
+    return JSON.parse(result);
+  } catch {
+    return null;
+  }
+}
+
 function hasGhCli() {
   try {
     execFileSync('which', ['gh'], { stdio: 'pipe' });
