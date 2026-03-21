@@ -4,10 +4,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from relay.parser import parse_transcript
 from relay.linear import create_issue
+from relay.history import add_entry, get_entries
 
 app = FastAPI(title="relay-cli")
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 class ParseRequest(BaseModel):
@@ -27,9 +28,15 @@ async def index():
 async def api_parse(req: ParseRequest):
     try:
         tickets = parse_transcript(req.transcript)
+        add_entry(tickets, source="dashboard")
         return {"tickets": tickets}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/history")
+async def api_history():
+    return {"entries": get_entries()}
 
 
 @app.post("/api/create")

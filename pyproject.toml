@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "relay-cli"
+version = "0.1.0"
+description = "Convert meeting/call transcripts into Linear issues using Claude AI"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "requests>=2.32.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+]
+
+[project.scripts]
+relay = "relay.cli:cli"
+
+[tool.setuptools.package-data]
+relay = ["static/*"]
+
+[tool.setuptools.packages.find]
+include = ["relay*"]
