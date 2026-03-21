@@ -136,23 +136,39 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 <h1>relay-cli</h1>
 <p class="subtitle">Transcript → Linear tickets, powered by Claude</p>
 
-<textarea id="transcript" placeholder="미팅/통화 transcript를 여기에 붙여넣으세요..."></textarea>
+<textarea id="transcript" placeholder="Paste your meeting/call transcript here..."></textarea>
 <div class="btn-row">
-  <button id="parseBtn" onclick="parseTranscript()">분석하기</button>
+  <button id="parseBtn" onclick="parseTranscript()">Analyze</button>
+  <label class="btn-secondary" style="display:inline-flex;align-items:center;padding:0.6rem 1.2rem;border-radius:var(--radius);cursor:pointer;font-size:0.9rem">
+    <input type="file" id="fileInput" accept=".txt,.md,.srt,.vtt" style="display:none" onchange="loadFile(event)">
+    Upload file
+  </label>
+  <span id="fileName" style="color:var(--text-muted);font-size:0.85rem;align-self:center"></span>
 </div>
 
 <div id="loading" class="loading">
-  <span class="spinner"></span> Claude가 분석 중...
+  <span class="spinner"></span> Claude is analyzing...
 </div>
 
 <div id="error" class="error"></div>
 <div id="results"></div>
 <div id="bulk-actions">
-  <button class="btn-success" onclick="createAll()">전체 Linear 생성</button>
+  <button class="btn-success" onclick="createAll()">Create all in Linear</button>
 </div>
 
 <script>
 let tickets = [];
+
+function loadFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('transcript').value = ev.target.result;
+  };
+  reader.readAsText(file);
+}
 
 async function parseTranscript() {
   const transcript = document.getElementById('transcript').value.trim();
@@ -181,7 +197,7 @@ async function parseTranscript() {
     tickets = data.tickets;
     renderTickets();
   } catch (e) {
-    error.textContent = '오류: ' + e.message;
+    error.textContent = 'Error:' + e.message;
   } finally {
     btn.disabled = false;
     loading.classList.remove('active');
@@ -192,7 +208,7 @@ function renderTickets() {
   const results = document.getElementById('results');
   results.innerHTML = '';
 
-  const priorityLabels = { 1: '긴급', 2: '높음', 3: '보통', 4: '낮음' };
+  const priorityLabels = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
 
   tickets.forEach((t, i) => {
     const card = document.createElement('div');
@@ -210,8 +226,8 @@ function renderTickets() {
       '<div class="ticket-desc">' + esc(t.description) + '</div>' +
       (labels ? '<div class="ticket-labels">' + labels + '</div>' : '') +
       '<div class="ticket-actions">' +
-        '<button onclick="createOne(' + i + ')">Linear 생성</button>' +
-        '<button class="btn-skip" onclick="skipOne(' + i + ')">건너뜀</button>' +
+        '<button onclick="createOne(' + i + ')">Create in Linear</button>' +
+        '<button class="btn-skip" onclick="skipOne(' + i + ')">Skip</button>' +
         '<span class="ticket-result" id="result-' + i + '"></span>' +
       '</div>';
 
@@ -226,7 +242,7 @@ function renderTickets() {
 async function createOne(i) {
   const result = document.getElementById('result-' + i);
   const card = document.getElementById('card-' + i);
-  result.textContent = '생성 중...';
+  result.textContent = 'Creating...';
   result.style.color = 'var(--text-muted)';
 
   try {
@@ -239,12 +255,12 @@ async function createOne(i) {
     if (data.error) throw new Error(data.error);
 
     result.style.color = 'var(--success)';
-    result.innerHTML = '<a href="' + esc(data.url) + '" target="_blank" style="color:var(--success)">' + esc(data.id) + '</a> 생성 완료';
+    result.innerHTML = '<a href="' + esc(data.url) + '" target="_blank" style="color:var(--success)">' + esc(data.id) + '</a> created';
     card.classList.add('created');
     card.querySelectorAll('button').forEach(b => b.disabled = true);
   } catch (e) {
     result.style.color = 'var(--p1)';
-    result.textContent = '오류: ' + e.message;
+    result.textContent = 'Error:' + e.message;
   }
 }
 
@@ -252,7 +268,7 @@ function skipOne(i) {
   const card = document.getElementById('card-' + i);
   card.classList.add('skipped');
   card.querySelectorAll('button').forEach(b => b.disabled = true);
-  document.getElementById('result-' + i).textContent = '건너뜀';
+  document.getElementById('result-' + i).textContent = 'Skipped';
 }
 
 async function createAll() {
