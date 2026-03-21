@@ -176,13 +176,13 @@ program
     const transcript = opts.text ? opts.text.trim() : readInput(file).trim();
     if (!transcript) error('Empty transcript. Provide a file, stdin, or --text.');
 
-    console.error('Analyzing transcript...');
-    const tickets = parseTranscript(transcript);
-    const source = opts.text ? 'text' : (file || 'stdin');
-    addEntry(tickets, source);
-
     const proj = getActiveProject();
     if (proj) console.error(`Using project: ${proj.name}`);
+
+    console.error('Analyzing...');
+    const tickets = parseTranscript(transcript, proj);
+    const source = opts.text ? 'text' : (file || 'stdin');
+    addEntry(tickets, source);
 
     if (opts.human) {
       printTicketsHuman(tickets);
@@ -306,6 +306,10 @@ project
   .description('Create a new project.')
   .option('--github-repo <repo>', 'GitHub repo (owner/repo)')
   .option('--linear-team-id <id>', 'Linear team UUID')
+  .option('--description <desc>', 'Project description')
+  .option('--stack <stack>', 'Tech stack')
+  .option('--status <status>', 'Current project status')
+  .option('--philosophy <text>', 'Project philosophy or principles')
   .option('--pretty', 'Pretty-print JSON output')
   .action((name, opts) => {
     const config = {};
@@ -324,6 +328,33 @@ project
       config.linear_team_id = LINEAR_TEAM_ID;
       console.error(`Using default Linear team: ${LINEAR_TEAM_ID}`);
     }
+    if (opts.description) config.description = opts.description;
+    if (opts.stack) config.stack = opts.stack;
+    if (opts.status) config.status = opts.status;
+    if (opts.philosophy) config.philosophy = opts.philosophy;
+    output(createProject(name, config), opts.pretty);
+  });
+
+project
+  .command('update <name>')
+  .description('Update a project\'s context and settings.')
+  .option('--github-repo <repo>', 'GitHub repo')
+  .option('--linear-team-id <id>', 'Linear team UUID')
+  .option('--description <desc>', 'Project description')
+  .option('--stack <stack>', 'Tech stack')
+  .option('--status <status>', 'Current project status')
+  .option('--philosophy <text>', 'Project philosophy or principles')
+  .option('--pretty', 'Pretty-print JSON output')
+  .action((name, opts) => {
+    const existing = getProject(name);
+    if (!existing) error(`Project '${name}' not found.`);
+    const { name: _, active: __, ...config } = existing;
+    if (opts.githubRepo) config.github_repo = opts.githubRepo;
+    if (opts.linearTeamId) config.linear_team_id = opts.linearTeamId;
+    if (opts.description) config.description = opts.description;
+    if (opts.stack) config.stack = opts.stack;
+    if (opts.status) config.status = opts.status;
+    if (opts.philosophy) config.philosophy = opts.philosophy;
     output(createProject(name, config), opts.pretty);
   });
 
@@ -430,12 +461,12 @@ fetch
   });
 
 async function parseAndOutput(text, source, opts) {
-  console.error('Analyzing...');
-  const tickets = parseTranscript(text);
-  addEntry(tickets, source);
-
   const proj = getActiveProject();
   if (proj) console.error(`Using project: ${proj.name}`);
+
+  console.error('Analyzing...');
+  const tickets = parseTranscript(text, proj);
+  addEntry(tickets, source);
 
   if (opts.human) {
     printTicketsHuman(tickets);

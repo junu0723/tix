@@ -159,7 +159,18 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
       <option value="github">GitHub</option>
     </select>
   </div>
-  <div id="projectInfo" style="color:var(--text-muted);font-size:0.8rem;margin-left:auto"></div>
+  <div id="projectInfo" style="color:var(--text-muted);font-size:0.8rem;margin-left:auto;cursor:pointer" onclick="toggleProjectContext()" title="Click to edit project context"></div>
+</div>
+<div id="projectContext" style="display:none;margin-bottom:1rem;padding:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+    <span style="font-size:0.9rem;font-weight:600">Project Context</span>
+    <button class="btn-secondary" onclick="saveProjectContext()" style="font-size:0.8rem;padding:0.3rem 0.6rem">Save</button>
+  </div>
+  <div class="edit-row"><label>Description</label><input class="edit-field" id="ctx-desc" placeholder="What this project does"></div>
+  <div class="edit-row"><label>Stack</label><input class="edit-field" id="ctx-stack" placeholder="e.g. Node.js, Express, Linear API"></div>
+  <div class="edit-row"><label>Status</label><input class="edit-field" id="ctx-status" placeholder="e.g. MVP done, working on v2"></div>
+  <div class="edit-row"><label>Philosophy</label><textarea class="edit-field edit-desc" id="ctx-philosophy" placeholder="Project principles, what to prioritize..."></textarea></div>
+  <div id="ctxStatus" style="color:var(--text-muted);font-size:0.8rem;margin-top:0.3rem"></div>
 </div>
 
 <textarea id="transcript" placeholder="Paste anything — transcript, notes, to-do list, braindump, doc..."></textarea>
@@ -288,14 +299,56 @@ async function switchProject() {
 function updateProjectInfo() {
   const name = document.getElementById('projectSelect').value;
   const info = document.getElementById('projectInfo');
-  if (!name) { info.textContent = ''; return; }
+  const ctxPanel = document.getElementById('projectContext');
+  if (!name) { info.textContent = ''; ctxPanel.style.display = 'none'; return; }
   const proj = projectsData.find(p => p.name === name);
   if (!proj) { info.textContent = ''; return; }
   const parts = [];
   if (proj.github_repo) parts.push('GitHub: ' + proj.github_repo);
   if (proj.linear_team_name) parts.push('Linear: ' + proj.linear_team_name);
   else if (proj.linear_team_id) parts.push('Linear: ' + proj.linear_team_id.slice(0, 8) + '...');
-  info.textContent = parts.join(' | ') || 'No targets configured';
+  if (proj.description) parts.push(proj.description);
+  info.textContent = parts.join(' · ') || 'Click to configure';
+
+  // Populate context fields
+  document.getElementById('ctx-desc').value = proj.description || '';
+  document.getElementById('ctx-stack').value = proj.stack || '';
+  document.getElementById('ctx-status').value = proj.status || '';
+  document.getElementById('ctx-philosophy').value = proj.philosophy || '';
+}
+
+function toggleProjectContext() {
+  const name = document.getElementById('projectSelect').value;
+  if (!name) return;
+  const el = document.getElementById('projectContext');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveProjectContext() {
+  const name = document.getElementById('projectSelect').value;
+  if (!name) return;
+  const proj = projectsData.find(p => p.name === name) || {};
+  const body = {
+    name,
+    github_repo: proj.github_repo || undefined,
+    linear_team_id: proj.linear_team_id || undefined,
+    description: document.getElementById('ctx-desc').value,
+    stack: document.getElementById('ctx-stack').value,
+    status: document.getElementById('ctx-status').value,
+    philosophy: document.getElementById('ctx-philosophy').value,
+  };
+  try {
+    await fetch('/api/projects/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    document.getElementById('ctxStatus').textContent = 'Saved!';
+    await loadProjects();
+    setTimeout(() => document.getElementById('ctxStatus').textContent = '', 2000);
+  } catch (e) {
+    document.getElementById('ctxStatus').textContent = 'Error: ' + e.message;
+  }
 }
 
 function getTarget() { return document.getElementById('targetSelect').value; }
@@ -343,7 +396,7 @@ async function parseTranscript() {
     const resp = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript }),
+      body: JSON.stringify({ transcript, project: getProject() }),
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);

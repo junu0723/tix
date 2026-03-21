@@ -6,7 +6,7 @@ import { parseTranscript } from './parser.js';
 import { createIssue as linearCreate, getTeamName } from './linear.js';
 import { createIssue as githubCreate } from './github.js';
 import { addEntry, getEntries, updateEntry } from './history.js';
-import { listProjects, getProject, setActiveProject, getActiveProjectName } from './projects.js';
+import { listProjects, getProject, setActiveProject, getActiveProjectName, createProject as saveProject } from './projects.js';
 import { fetchDoc, fetchSheet, hasGwsCli } from './google.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,7 +24,14 @@ export function startServer(host = '127.0.0.1', port = 8000) {
 
   app.post('/api/parse', async (req, res) => {
     try {
-      const tickets = parseTranscript(req.body.transcript);
+      const { transcript, project: projectName } = req.body;
+      let proj = null;
+      if (projectName) proj = getProject(projectName);
+      else {
+        const activeName = getActiveProjectName();
+        if (activeName) proj = getProject(activeName);
+      }
+      const tickets = parseTranscript(transcript, proj);
       addEntry(tickets, 'dashboard');
       res.json({ tickets });
     } catch (e) {
@@ -102,6 +109,17 @@ export function startServer(host = '127.0.0.1', port = 8000) {
       }
     }
     res.json({ projects, active: getActiveProjectName() });
+  });
+
+  app.post('/api/projects/update', (req, res) => {
+    try {
+      const { name, ...config } = req.body;
+      if (!name) return res.status(400).json({ error: 'name is required' });
+      const result = saveProject(name, config);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post('/api/projects/use', (req, res) => {

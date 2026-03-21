@@ -1,7 +1,6 @@
-import { execFileSync } from 'child_process';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 
-const PROMPT = `You are an expert at converting any type of input into actionable tickets.
+const BASE_PROMPT = `You are an expert at converting any type of input into actionable tickets.
 
 Your input may be one of:
 - Meeting/call transcript
@@ -10,6 +9,7 @@ Your input may be one of:
 - A document or spec
 - Spreadsheet data (CSV/table format)
 - Email thread
+- QA feedback / bug reports
 - Any other text containing actionable items
 
 Your job: Identify every actionable item and convert each into a ticket.
@@ -37,9 +37,28 @@ Priority levels:
 2 = High (critical bug, important request, upcoming deadline)
 3 = Medium (improvement, general request)
 4 = Low (nice-to-have, can be done later)
-
-input:
 `;
+
+function buildContextBlock(project) {
+  if (!project) return '';
+
+  const lines = ['[Project Context]'];
+  if (project.name) lines.push(`Name: ${project.name}`);
+  if (project.description) lines.push(`Description: ${project.description}`);
+  if (project.stack) lines.push(`Tech stack: ${project.stack}`);
+  if (project.status) lines.push(`Current status: ${project.status}`);
+  if (project.philosophy) lines.push(`Philosophy/principles:\n${project.philosophy}`);
+
+  lines.push('');
+  lines.push('Use this context to:');
+  lines.push('- Make ticket titles and descriptions technically specific to this project');
+  lines.push('- Align priorities with the project\'s current status and goals');
+  lines.push('- Use labels that match the project\'s tech stack and domain');
+  lines.push('- Flag items that conflict with the project philosophy');
+  lines.push('');
+
+  return lines.join('\n');
+}
 
 function findClaude() {
   try {
@@ -49,11 +68,14 @@ function findClaude() {
   }
 }
 
-export function parseTranscript(transcript) {
+export function parseTranscript(text, project = null) {
   const claudePath = findClaude();
 
+  const contextBlock = buildContextBlock(project);
+  const fullPrompt = contextBlock + BASE_PROMPT + 'input:\n' + text;
+
   const result = execFileSync(claudePath, [
-    '-p', PROMPT + transcript,
+    '-p', fullPrompt,
     '--output-format', 'text',
   ], {
     encoding: 'utf8',
