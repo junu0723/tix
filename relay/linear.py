@@ -18,6 +18,30 @@ mutation CreateIssue($input: IssueCreateInput!) {
 """
 
 
+def get_teams() -> list[dict]:
+    """Fetch all teams the user has access to."""
+    if not LINEAR_API_KEY:
+        return []
+    resp = requests.post(
+        GRAPHQL_ENDPOINT,
+        json={"query": "{ teams { nodes { id name key } } }"},
+        headers={"Authorization": LINEAR_API_KEY, "Content-Type": "application/json"},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        return []
+    data = resp.json()
+    return data.get("data", {}).get("teams", {}).get("nodes", [])
+
+
+def get_team_name(team_id: str) -> str | None:
+    """Get team name by ID."""
+    for t in get_teams():
+        if t["id"] == team_id:
+            return f"{t['name']} ({t['key']})"
+    return None
+
+
 def create_issue(ticket: dict, team_id: str = None) -> dict:
     if not LINEAR_API_KEY:
         raise RuntimeError("LINEAR_API_KEY is not set. Check your .env file.")

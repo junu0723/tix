@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from relay.parser import parse_transcript
-from relay.linear import create_issue as linear_create
+from relay.linear import create_issue as linear_create, get_team_name
 from relay.github import create_issue as github_create
 from relay.history import add_entry, get_entries, update_entry
 from relay.projects import list_projects, get_project, set_active_project, get_active_project_name
@@ -83,8 +83,14 @@ async def api_create(req: CreateRequest):
 
 @app.get("/api/projects")
 async def api_projects():
+    projects = list_projects()
+    for p in projects:
+        if p.get("linear_team_id"):
+            name = get_team_name(p["linear_team_id"])
+            if name:
+                p["linear_team_name"] = name
     return {
-        "projects": list_projects(),
+        "projects": projects,
         "active": get_active_project_name(),
     }
 
