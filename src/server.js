@@ -2,7 +2,7 @@ import express from 'express';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { parseTranscript, parseTranscriptStream } from './parser.js';
+import { parseTranscript } from './parser.js';
 import { createIssue as linearCreate, getTeamName } from './linear.js';
 import { createIssue as githubCreate } from './github.js';
 import { addEntry, getEntries, updateEntry, deleteEntry } from './history.js';
@@ -38,33 +38,6 @@ export function startServer(host = '127.0.0.1', port = 8000) {
     }
   });
 
-  app.post('/api/parse/stream', async (req, res) => {
-    const { transcript, project: projectName } = req.body;
-    let proj = null;
-    if (projectName) proj = getProject(projectName);
-    else {
-      const activeName = getActiveProjectName();
-      if (activeName) proj = getProject(activeName);
-    }
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    });
-
-    try {
-      await parseTranscriptStream(transcript, proj, (event) => {
-        const json = JSON.stringify(event);
-        // SSE data lines can't contain raw newlines — split into multiple data: lines
-        const lines = json.split('\n').map(l => `data: ${l}`).join('\n');
-        res.write(lines + '\n\n');
-      });
-    } catch (e) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: e.message })}\n\n`);
-    }
-    res.end();
-  });
 
   app.get('/api/history', (req, res) => {
     res.json({ entries: getEntries() });
