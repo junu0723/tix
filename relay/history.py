@@ -26,5 +26,12 @@ def add_entry(tickets: list[dict], source: str = ""):
     _save(entries)
 
 
+def update_entry(index: int, tickets: list[dict]):
+    entries = _load()
+    if 0 <= index < len(entries):
+        entries[index]["tickets"] = tickets
+        _save(entries)
+
+
 def get_entries() -> list[dict]:
     return _load()

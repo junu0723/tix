@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from relay.parser import parse_transcript
 from relay.linear import create_issue
-from relay.history import add_entry, get_entries
+from relay.history import add_entry, get_entries, update_entry
 
 app = FastAPI(title="relay-cli")
 
@@ -37,6 +37,20 @@ async def api_parse(req: ParseRequest):
 @app.get("/api/history")
 async def api_history():
     return {"entries": get_entries()}
+
+
+class UpdateHistoryRequest(BaseModel):
+    index: int
+    tickets: list[dict]
+
+
+@app.post("/api/history/update")
+async def api_history_update(req: UpdateHistoryRequest):
+    try:
+        update_entry(req.index, req.tickets)
+        return {"ok": True}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.post("/api/create")

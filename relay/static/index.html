@@ -39,7 +39,7 @@ body {
   max-width: 800px;
   margin: 0 auto;
 }
-h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+h1 { font-size: 1.5rem; margin-bottom: 0.25rem; cursor: pointer; }
 .subtitle { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
 textarea {
   width: 100%;
@@ -139,7 +139,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 </style>
 </head>
 <body>
-<h1>relay-cli</h1>
+<h1 onclick="resetView()">relay-cli</h1>
 <p class="subtitle">Transcript → Linear tickets, powered by Claude</p>
 
 <textarea id="transcript" placeholder="Paste your meeting/call transcript here..."></textarea>
@@ -172,6 +172,17 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 
 <script>
 let tickets = [];
+let currentHistoryIndex = 0;
+
+function resetView() {
+  tickets = [];
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('bulk-actions').style.display = 'none';
+  document.getElementById('error').textContent = '';
+  document.getElementById('transcript').value = '';
+  document.getElementById('fileName').textContent = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 function loadFile(e) {
   const file = e.target.files[0];
@@ -230,6 +241,9 @@ function renderTickets() {
     const p = t.priority || 3;
     const labels = (t.labels || []).map(l => '<span class="label">' + esc(l) + '</span>').join('');
     const labelsStr = (t.labels || []).join(', ');
+    const alreadyCreated = !!t.linearId;
+
+    if (alreadyCreated) card.classList.add('created');
 
     card.innerHTML =
       '<div class="view-mode" id="view-' + i + '">' +
@@ -252,10 +266,12 @@ function renderTickets() {
         '<div class="edit-row"><label>Labels</label><input class="edit-field" id="ed-labels-' + i + '" value="' + esc(labelsStr) + '" placeholder="comma separated"></div>' +
       '</div>' +
       '<div class="ticket-actions">' +
-        '<button onclick="createOne(' + i + ')">Create in Linear</button>' +
-        '<button class="btn-secondary" onclick="toggleEdit(' + i + ')" id="editBtn-' + i + '" style="font-size:0.8rem">Edit</button>' +
-        '<button class="btn-skip" onclick="skipOne(' + i + ')">Skip</button>' +
-        '<span class="ticket-result" id="result-' + i + '"></span>' +
+        '<button onclick="createOne(' + i + ')"' + (alreadyCreated?' disabled':'') + '>Create in Linear</button>' +
+        '<button class="btn-secondary" onclick="toggleEdit(' + i + ')" id="editBtn-' + i + '" style="font-size:0.8rem"' + (alreadyCreated?' disabled':'') + '>Edit</button>' +
+        '<button class="btn-skip" onclick="skipOne(' + i + ')"' + (alreadyCreated?' disabled':'') + '>Skip</button>' +
+        '<span class="ticket-result" id="result-' + i + '">' +
+          (alreadyCreated ? '<a href="' + esc(t.linearUrl) + '" target="_blank" style="color:var(--success)">' + esc(t.linearId) + '</a> created' : '') +
+        '</span>' +
       '</div>';
 
     results.appendChild(card);
@@ -300,10 +316,13 @@ async function createOne(i) {
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
 
+    tickets[i].linearId = data.id;
+    tickets[i].linearUrl = data.url;
     result.style.color = 'var(--success)';
     result.innerHTML = '<a href="' + esc(data.url) + '" target="_blank" style="color:var(--success)">' + esc(data.id) + '</a> created';
     card.classList.add('created');
     card.querySelectorAll('button').forEach(b => b.disabled = true);
+    saveTicketsToHistory();
   } catch (e) {
     result.style.color = 'var(--p1)';
     result.textContent = 'Error:' + e.message;
@@ -337,9 +356,17 @@ async function loadHistory() {
     }
     list.innerHTML = data.entries.map((entry, ei) => {
       const date = new Date(entry.timestamp).toLocaleString();
-      const ticketSummary = entry.tickets.map(t => '<span style="margin-left:1rem;display:block;color:var(--text)">' + esc(t.title) + '</span>').join('');
+      const created = entry.tickets.filter(t => t.linearId).length;
+      const total = entry.tickets.length;
+      const badge = created > 0
+        ? '<span style="color:var(--success)">' + created + '/' + total + ' created</span>'
+        : '<span>' + total + ' ticket(s)</span>';
+      const ticketSummary = entry.tickets.map(t => {
+        const icon = t.linearId ? '<span style="color:var(--success);margin-right:0.3rem">&#10003;</span>' : '<span style="color:var(--text-muted);margin-right:0.3rem">&#9675;</span>';
+        return '<span style="margin-left:1rem;display:block;color:var(--text)">' + icon + esc(t.title) + '</span>';
+      }).join('');
       return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.8rem;margin-bottom:0.5rem;cursor:pointer" onclick="restoreHistory(' + ei + ')">' +
-        '<div style="display:flex;justify-content:space-between"><span>' + date + '</span><span>' + entry.tickets.length + ' ticket(s)</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span>' + date + '</span>' + badge + '</div>' +
         ticketSummary +
       '</div>';
     }).join('');
@@ -350,10 +377,19 @@ async function loadHistory() {
 
 function restoreHistory(ei) {
   fetch('/api/history').then(r => r.json()).then(data => {
+    currentHistoryIndex = ei;
     tickets = data.entries[ei].tickets;
     renderTickets();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
+}
+
+function saveTicketsToHistory() {
+  fetch('/api/history/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ index: currentHistoryIndex, tickets }),
+  }).then(() => loadHistory());
 }
 
 loadHistory();
