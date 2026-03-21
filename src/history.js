@@ -36,6 +36,16 @@ export function getEntries() {
   return load();
 }
 
+export function deleteEntry(index) {
+  const entries = load();
+  if (index >= 0 && index < entries.length) {
+    entries.splice(index, 1);
+    save(entries);
+    return true;
+  }
+  return false;
+}
+
 export function clearHistory() {
   if (existsSync(HISTORY_FILE)) unlinkSync(HISTORY_FILE);
 }

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { parseTranscript } from './parser.js';
 import { createIssue as linearCreate, getTeamName } from './linear.js';
 import { createIssue as githubCreate } from './github.js';
-import { addEntry, getEntries, updateEntry } from './history.js';
+import { addEntry, getEntries, updateEntry, deleteEntry } from './history.js';
 import { listProjects, getProject, setActiveProject, getActiveProjectName, createProject as saveProject } from './projects.js';
 import { fetchDoc, fetchSheet, hasGwsCli } from './google.js';
 
@@ -46,6 +46,15 @@ export function startServer(host = '127.0.0.1', port = 8000) {
   app.post('/api/history/update', (req, res) => {
     try {
       updateEntry(req.body.index, req.body.tickets);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/history/delete', (req, res) => {
+    try {
+      deleteEntry(req.body.index);
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
