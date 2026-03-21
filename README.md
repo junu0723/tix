@@ -8,13 +8,13 @@ Feed it meeting transcripts, notes, braindumps, to-do lists — it extracts acti
 
 ```bash
 # No install needed
-npx tix-cli parse --text "Fix the login bug by Friday, add dark mode support" --human
+npx @junu0723/tix parse --text "Fix the login bug by Friday, add dark mode support" --human
 ```
 
 ## Install
 
 ```bash
-npm install -g tix-cli
+npm install -g @junu0723/tix
 tix --help
 ```
 
@@ -157,7 +157,7 @@ Credentials load from `.env` (local) or `~/.tix/.env` (global).
 ## Uninstall
 
 ```bash
-npm uninstall -g tix-cli
+npm uninstall -g @junu0723/tix
 rm -rf ~/.tix
 ```
 

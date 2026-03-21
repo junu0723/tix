@@ -1,5 +1,5 @@
 {
-  "name": "tix-cli",
+  "name": "@junu0723/tix",
   "version": "0.1.0",
   "description": "AI-powered CLI that turns any text into actionable Linear or GitHub issues",
   "type": "module",
