@@ -198,6 +198,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 
 <div id="loading" class="loading">
   <span class="spinner"></span> <span id="loadingText">Claude is analyzing...</span>
+  <button onclick="cancelParse()" style="margin-left:0.5rem;font-size:0.8rem;padding:0.3rem 0.8rem;background:transparent;border:1px solid var(--border);color:var(--text-muted)">Cancel</button>
 </div>
 
 <div id="error" class="error"></div>
@@ -220,6 +221,11 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 <script>
 let tickets = [];
 let currentHistoryIndex = 0;
+let parseAbort = null;
+
+function cancelParse() {
+  if (parseAbort) parseAbort.abort();
+}
 
 function showGoogleImport() {
   const el = document.getElementById('google-import');
@@ -403,10 +409,12 @@ async function parseTranscript() {
   }, 1000);
 
   try {
+    parseAbort = new AbortController();
     const resp = await fetch('/api/parse/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transcript, project: getProject() }),
+      signal: parseAbort.signal,
     });
 
     const reader = resp.body.getReader();
@@ -458,8 +466,9 @@ async function parseTranscript() {
       document.getElementById('results').prepend(statsEl);
     }
   } catch (e) {
-    error.textContent = 'Error: ' + e.message;
+    if (e.name !== 'AbortError') error.textContent = 'Error: ' + e.message;
   } finally {
+    parseAbort = null;
     clearInterval(timer);
     loadingText.textContent = 'Claude is analyzing...';
     btn.disabled = false;
