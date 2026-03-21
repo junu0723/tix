@@ -55,7 +55,10 @@ export function startServer(host = '127.0.0.1', port = 8000) {
 
     try {
       await parseTranscriptStream(transcript, proj, (event) => {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        const json = JSON.stringify(event);
+        // SSE data lines can't contain raw newlines — split into multiple data: lines
+        const lines = json.split('\n').map(l => `data: ${l}`).join('\n');
+        res.write(lines + '\n\n');
       });
     } catch (e) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: e.message })}\n\n`);

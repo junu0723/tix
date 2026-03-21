@@ -375,8 +375,10 @@ async function parseTranscript() {
       sseBuffer = events.pop(); // keep incomplete event
 
       for (const eventBlock of events) {
-        const dataLine = eventBlock.split('\n').find(l => l.startsWith('data: '));
-        if (!dataLine) continue;
+        if (!eventBlock.trim()) continue;
+        const dataLines = eventBlock.split('\n').filter(l => l.startsWith('data: '));
+        if (!dataLines.length) continue;
+        const dataLine = 'data: ' + dataLines.map(l => l.slice(6)).join('\n');
         try {
           const event = JSON.parse(dataLine.slice(6));
 
