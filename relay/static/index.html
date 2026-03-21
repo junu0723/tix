@@ -136,11 +136,30 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .edit-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
 .edit-row label { font-size: 0.75rem; color: var(--text-muted); min-width: 55px; }
 select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
+.toolbar { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; padding: 0.6rem 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; flex-wrap: wrap; }
+.toolbar label { color: var(--text-muted); font-size: 0.8rem; }
+.toolbar select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
 </style>
 </head>
 <body>
 <h1 onclick="resetView()">relay-cli</h1>
-<p class="subtitle">Transcript → Linear tickets, powered by Claude</p>
+<p class="subtitle">Transcript → Linear / GitHub issues, powered by Claude</p>
+
+<div class="toolbar">
+  <div>
+    <label>Project</label>
+    <select id="projectSelect" onchange="switchProject()">
+      <option value="">(none)</option>
+    </select>
+  </div>
+  <div>
+    <label>Target</label>
+    <select id="targetSelect">
+      <option value="linear">Linear</option>
+      <option value="github">GitHub</option>
+    </select>
+  </div>
+</div>
 
 <textarea id="transcript" placeholder="Paste your meeting/call transcript here..."></textarea>
 <div class="btn-row">
@@ -159,7 +178,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 <div id="error" class="error"></div>
 <div id="results"></div>
 <div id="bulk-actions">
-  <button class="btn-success" onclick="createAll()">Create all in Linear</button>
+  <button class="btn-success" onclick="createAll()">Create all</button>
 </div>
 
 <div id="history-section" style="margin-top:3rem;border-top:1px solid var(--border);padding-top:2rem">
@@ -173,6 +192,38 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 <script>
 let tickets = [];
 let currentHistoryIndex = 0;
+
+async function loadProjects() {
+  try {
+    const resp = await fetch('/api/projects');
+    const data = await resp.json();
+    const sel = document.getElementById('projectSelect');
+    sel.innerHTML = '<option value="">(none)</option>';
+    (data.projects || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.name;
+      opt.textContent = p.name;
+      if (p.name === data.active) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (e) {}
+}
+
+async function switchProject() {
+  const name = document.getElementById('projectSelect').value;
+  if (name) {
+    await fetch('/api/projects/use', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+  }
+}
+
+function getTarget() { return document.getElementById('targetSelect').value; }
+function getProject() { return document.getElementById('projectSelect').value || null; }
+
+loadProjects();
 
 function resetView() {
   tickets = [];
@@ -266,7 +317,7 @@ function renderTickets() {
         '<div class="edit-row"><label>Labels</label><input class="edit-field" id="ed-labels-' + i + '" value="' + esc(labelsStr) + '" placeholder="comma separated"></div>' +
       '</div>' +
       '<div class="ticket-actions">' +
-        '<button onclick="createOne(' + i + ')"' + (alreadyCreated?' disabled':'') + '>Create in Linear</button>' +
+        '<button onclick="createOne(' + i + ')"' + (alreadyCreated?' disabled':'') + '>Create</button>' +
         '<button class="btn-secondary" onclick="toggleEdit(' + i + ')" id="editBtn-' + i + '" style="font-size:0.8rem"' + (alreadyCreated?' disabled':'') + '>Edit</button>' +
         '<button class="btn-skip" onclick="skipOne(' + i + ')"' + (alreadyCreated?' disabled':'') + '>Skip</button>' +
         '<span class="ticket-result" id="result-' + i + '">' +
@@ -311,7 +362,7 @@ async function createOne(i) {
     const resp = await fetch('/api/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticket: tickets[i] }),
+      body: JSON.stringify({ ticket: tickets[i], target: getTarget(), project: getProject() }),
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
