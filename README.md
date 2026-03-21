@@ -154,6 +154,19 @@ The web UI provides a human-friendly interface:
 
 Credentials load from `.env` (local) or `~/.tix/.env` (global).
 
+## Claude Code Skill
+
+tix is available as a [Claude Code skill](https://skills.sh). Install it to let Claude Code use tix automatically when you ask to create tickets.
+
+```bash
+# Install the skill
+npx skills add junu0723/tix -g -y
+
+# Then just ask Claude Code:
+# "turn these meeting notes into Linear issues"
+# "create tickets from this braindump"
+```
+
 ## Uninstall
 
 ```bash
