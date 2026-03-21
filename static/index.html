@@ -370,13 +370,15 @@ async function parseTranscript() {
       if (done) break;
       sseBuffer += decoder.decode(value, { stream: true });
 
-      const lines = sseBuffer.split('\n');
-      sseBuffer = lines.pop();
+      // Split on double newline (SSE event boundary)
+      const events = sseBuffer.split('\n\n');
+      sseBuffer = events.pop(); // keep incomplete event
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
+      for (const eventBlock of events) {
+        const dataLine = eventBlock.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
         try {
-          const event = JSON.parse(line.slice(6));
+          const event = JSON.parse(dataLine.slice(6));
 
           if (event.type === 'progress') {
             const sec = Math.floor((Date.now() - startTime) / 1000);
@@ -392,7 +394,8 @@ async function parseTranscript() {
             throw new Error(event.message);
           }
         } catch (e) {
-          if (e.message && !e.message.includes('JSON')) throw e;
+          if (e.name === 'SyntaxError') continue; // incomplete JSON, wait for more
+          throw e;
         }
       }
     }
