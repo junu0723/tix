@@ -197,7 +197,7 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 </div>
 
 <div id="loading" class="loading">
-  <span class="spinner"></span> Claude is analyzing...
+  <span class="spinner"></span> <span id="loadingText">Claude is analyzing...</span>
 </div>
 
 <div id="error" class="error"></div>
@@ -394,6 +394,15 @@ async function parseTranscript() {
   results.innerHTML = '';
   document.getElementById('bulk-actions').style.display = 'none';
 
+  const loadingText = document.getElementById('loadingText');
+  const startTime = Date.now();
+  const timer = setInterval(() => {
+    const sec = Math.floor((Date.now() - startTime) / 1000);
+    loadingText.textContent = sec < 10
+      ? 'Claude is analyzing...'
+      : 'Claude is analyzing... (' + sec + 's) — large inputs may take a while';
+  }, 1000);
+
   try {
     const resp = await fetch('/api/parse', {
       method: 'POST',
@@ -406,8 +415,10 @@ async function parseTranscript() {
     tickets = data.tickets;
     renderTickets();
   } catch (e) {
-    error.textContent = 'Error:' + e.message;
+    error.textContent = 'Error: ' + e.message;
   } finally {
+    clearInterval(timer);
+    loadingText.textContent = 'Claude is analyzing...';
     btn.disabled = false;
     loading.classList.remove('active');
   }
