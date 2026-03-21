@@ -358,6 +358,102 @@ project
     else error(`Project '${name}' not found.`);
   });
 
+// ── fetch ──────────────────────────────────────────────────────────────
+
+const fetch = program.command('fetch').description('Fetch content from Google Workspace and parse into tickets.');
+
+fetch
+  .command('doc <docId>')
+  .description('Fetch a Google Doc and parse into tickets.')
+  .option('--push', 'Create issues immediately')
+  .option('--target <target>', 'Target platform', 'linear')
+  .option('--pretty', 'Pretty-print JSON output')
+  .option('--human', 'Human-readable output')
+  .action(async (docId, opts) => {
+    const { fetchDoc } = await import('./google.js');
+    console.error(`Fetching Google Doc...`);
+    const doc = fetchDoc(docId);
+    console.error(`Got: "${doc.title}" (${doc.text.length} chars)`);
+    await parseAndOutput(doc.text, `gdoc:${docId}`, opts);
+  });
+
+fetch
+  .command('sheet <spreadsheetId> [range]')
+  .description('Fetch a Google Sheet and parse into tickets.')
+  .option('--push', 'Create issues immediately')
+  .option('--target <target>', 'Target platform', 'linear')
+  .option('--pretty', 'Pretty-print JSON output')
+  .option('--human', 'Human-readable output')
+  .action(async (spreadsheetId, range, opts) => {
+    const { fetchSheet } = await import('./google.js');
+    console.error(`Fetching Google Sheet...`);
+    const sheet = fetchSheet(spreadsheetId, range || 'Sheet1');
+    console.error(`Got: ${sheet.text.split('\n').length} rows`);
+    await parseAndOutput(sheet.text, `gsheet:${spreadsheetId}`, opts);
+  });
+
+fetch
+  .command('meet [conferenceId]')
+  .description('Fetch a Google Meet transcript and parse into tickets.')
+  .option('--push', 'Create issues immediately')
+  .option('--target <target>', 'Target platform', 'linear')
+  .option('--pretty', 'Pretty-print JSON output')
+  .option('--human', 'Human-readable output')
+  .option('--list', 'List recent meetings instead of fetching')
+  .action(async (conferenceId, opts) => {
+    const { fetchMeetTranscripts, fetchMeetTranscript } = await import('./google.js');
+
+    if (opts.list || !conferenceId) {
+      console.error('Listing recent meetings...');
+      const meetings = fetchMeetTranscripts();
+      output({ meetings, count: meetings.length }, opts.pretty);
+      return;
+    }
+
+    console.error(`Fetching Meet transcript...`);
+    const conferenceName = conferenceId.startsWith('conferenceRecords/')
+      ? conferenceId : `conferenceRecords/${conferenceId}`;
+    const transcript = fetchMeetTranscript(conferenceName);
+    if (!transcript) error('No transcript found for this meeting.');
+    console.error(`Got transcript (${transcript.text.length} chars)`);
+    await parseAndOutput(transcript.text, `meet:${conferenceId}`, opts);
+  });
+
+async function parseAndOutput(text, source, opts) {
+  console.error('Analyzing...');
+  const tickets = parseTranscript(text);
+  addEntry(tickets, source);
+
+  const proj = getActiveProject();
+  if (proj) console.error(`Using project: ${proj.name}`);
+
+  if (opts.human) {
+    printTicketsHuman(tickets);
+    if (opts.push) {
+      await confirm(`Create these issues in ${opts.target}?`);
+      await pushTicketsHuman(tickets, opts.target, proj);
+    }
+    return;
+  }
+
+  const result = { tickets, count: tickets.length, source, target: opts.target };
+  if (proj) result.project = proj.name;
+
+  if (opts.push) {
+    const created = [];
+    for (const t of tickets) {
+      const issue = await createIssue(t, opts.target, proj);
+      t.issueId = issue.id;
+      t.issueUrl = issue.url;
+      created.push(issue);
+      console.error(`Created ${issue.id}`);
+    }
+    result.created = created;
+  }
+
+  output(result, opts.pretty);
+}
+
 // ── dashboard ──────────────────────────────────────────────────────────
 
 program

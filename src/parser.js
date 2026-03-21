@@ -1,13 +1,26 @@
 import { execFileSync } from 'child_process';
 import { execSync } from 'child_process';
 
-const PROMPT = `You are an expert at analyzing meeting/call transcripts and converting them into Linear tickets.
+const PROMPT = `You are an expert at converting any type of input into actionable tickets.
+
+Your input may be one of:
+- Meeting/call transcript
+- A to-do list or bullet points
+- Freeform notes or braindump
+- A document or spec
+- Spreadsheet data (CSV/table format)
+- Email thread
+- Any other text containing actionable items
+
+Your job: Identify every actionable item and convert each into a ticket.
 
 Rules:
 - Each ticket must be an independently executable unit
 - Split into mutually exclusive items with no duplicates
 - Output ONLY a JSON array (no other text)
-- Write tickets in the same language as the transcript
+- Write tickets in the same language as the input
+- Infer priority from context (urgency, deadlines, severity)
+- Infer appropriate labels from context
 
 Output format:
 [
@@ -20,12 +33,12 @@ Output format:
 ]
 
 Priority levels:
-1 = Urgent (service outage, data loss, etc.)
-2 = High (critical bug, important request)
+1 = Urgent (service outage, data loss, blocking issue)
+2 = High (critical bug, important request, upcoming deadline)
 3 = Medium (improvement, general request)
 4 = Low (nice-to-have, can be done later)
 
-transcript:
+input:
 `;
 
 function findClaude() {
