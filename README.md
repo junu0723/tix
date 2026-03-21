@@ -1,121 +1,130 @@
 # @junu0723/relay
 
-AI-powered CLI that turns any text into actionable tickets. Feed it transcripts, notes, braindumps, Google Docs, Sheets — it creates Linear or GitHub issues automatically.
+AI-powered CLI that turns any text into actionable tickets.
 
-```
-Any input → Claude AI (extract tickets) → Linear / GitHub (create issues) → Human just approves
-```
+Feed it meeting transcripts, notes, braindumps, to-do lists, Google Docs, Sheets — it extracts actionable items and creates Linear or GitHub issues automatically. Designed primarily for AI agents, with a web dashboard for humans.
 
 ## Install
 
 ```bash
-# Global install (recommended)
+# Global install
 npm install -g @junu0723/relay
 relay --help
 
 # Or run without installing
-npx @junu0723/relay parse meeting.txt
+npx @junu0723/relay --help
 ```
 
 ### Prerequisites
 
 - Node.js 18+
-- [Claude Code CLI](https://github.com/anthropics/claude-code) installed and authenticated
+- [Claude Code CLI](https://github.com/anthropics/claude-code) — used for AI-powered parsing
 
 ### Optional (auto-detected)
 
-- [GitHub CLI (`gh`)](https://cli.github.com/) — GitHub issues without a token
-- [Linear CLI (`lin`)](https://www.npmjs.com/package/@linear/cli) — Linear issues without an API key
+- [GitHub CLI (`gh`)](https://cli.github.com/) — create GitHub issues without a token
+- [Linear CLI (`lin`)](https://www.npmjs.com/package/@linear/cli) — create Linear issues without an API key
 - [Google Workspace CLI (`gws`)](https://github.com/nicholasgasior/gws) — import from Google Docs, Sheets, and Meet
 
-## Setup
+## Quick Start
 
 ```bash
-# Interactive (prompts for all credentials)
+# 1. Configure credentials
 relay setup
 
-# Linear only
-relay setup --linear-api-key lin_api_xxx --linear-team-id your-team-uuid
+# 2. Create a project (auto-detects GitHub repo and Linear team)
+relay project create my-project
 
-# GitHub only (or skip if you have gh CLI)
-relay setup --github-token ghp_xxx --github-repo owner/repo
+# 3. Parse any text into tickets
+relay parse meeting.txt --human
 
-# Save globally (~/.relay-cli/.env)
-relay setup --global --linear-api-key lin_api_xxx --linear-team-id uuid
+# 4. Parse and create issues in one step
+relay parse meeting.txt --push
 ```
 
-Check your configuration:
+## CLI Reference
+
+All commands output structured JSON to stdout. Status messages go to stderr.
+
+### `relay parse`
+
+Parse any text into tickets. Accepts transcripts, notes, to-do lists, braindumps, docs, spreadsheet data — anything with actionable items.
+
+When a project is active, its context (description, stack, philosophy) and existing GitHub issues are injected into the prompt for smarter, project-aware ticket generation.
+
+```bash
+relay parse meeting.txt                        # from file
+cat notes.md | relay parse                     # from stdin
+relay parse --text "Fix the login bug"         # inline text
+relay parse meeting.txt --push                 # parse + create in Linear
+relay parse meeting.txt --push --target github # parse + create in GitHub
+relay parse meeting.txt --pretty               # pretty JSON output
+relay parse meeting.txt --human                # human-readable output
+```
+
+### `relay create`
+
+Create issues directly from JSON or flags.
+
+```bash
+relay parse notes.txt | jq '.tickets' | relay create         # pipe from parse
+relay create tickets.json                                     # from JSON file
+relay create --title "Fix bug" --priority 2 --labels "bug"    # from flags
+relay create --target github                                  # target GitHub
+```
+
+### `relay fetch`
+
+Import content from Google Workspace (requires `gws` CLI).
+
+```bash
+relay fetch doc <docId>                              # Google Doc
+relay fetch doc <docId> --push                       # fetch + parse + create
+relay fetch sheet <spreadsheetId>                    # Google Sheet (full)
+relay fetch sheet <spreadsheetId> "Sheet2!A1:D20"    # specific range
+relay fetch meet --list                              # list recent meetings
+relay fetch meet <conferenceId> --push               # fetch transcript + create
+```
+
+### `relay project`
+
+Manage projects with per-project output targets and context.
+
+Each project stores its GitHub repo, Linear team, and context (description, tech stack, current status, philosophy). When active, this context is used during parsing for smarter ticket generation.
+
+```bash
+relay project create my-app                                  # auto-detect repo/team
+relay project create my-app --github-repo owner/repo         # explicit targets
+relay project update my-app --description "..." --stack "..." # add context
+relay project update my-app --philosophy "..."                # add philosophy
+relay project use my-app                                      # set active
+relay project list --pretty                                   # list all
+relay project show --pretty                                   # show active
+relay project delete old-project --yes                        # delete
+```
+
+### `relay setup`
+
+Configure API credentials.
+
+```bash
+relay setup                                                  # interactive
+relay setup --linear-api-key KEY --linear-team-id ID         # Linear
+relay setup --github-token TOKEN --github-repo owner/repo    # GitHub
+relay setup --global                                         # save to ~/.relay-cli/.env
+```
+
+### `relay status`
+
+Show configuration, detected CLIs, and readiness.
 
 ```bash
 relay status
 ```
 
-## Projects
+### `relay history`
 
-Projects let you manage multiple output targets (different repos, teams) and switch between them.
-
-```bash
-# Create a project (auto-detects GitHub repo and Linear team)
-relay project create webapp
-relay project create webapp --github-repo owner/webapp --linear-team-id uuid
-
-# List / switch / show / delete
-relay project list --pretty
-relay project use webapp
-relay project show --pretty
-relay project delete old-project --yes
-```
-
-## CLI Usage
-
-All commands output structured JSON to stdout. Status messages go to stderr.
-Use `--target linear` (default) or `--target github` to choose where issues are created.
-
-### Parse any input
-
-Accepts transcripts, notes, to-do lists, braindumps, docs — anything with actionable items.
-
-```bash
-relay parse meeting.txt
-cat notes.md | relay parse
-relay parse --text "Fix the login bug by Friday"
-relay parse meeting.txt --push
-relay parse meeting.txt --push --target github
-relay parse meeting.txt --pretty
-relay parse meeting.txt --human
-```
-
-### Fetch from Google Workspace
-
-Requires [gws CLI](https://github.com/nicholasgasior/gws).
-
-```bash
-# Google Doc
-relay fetch doc <docId>
-relay fetch doc <docId> --push --target linear
-
-# Google Sheet
-relay fetch sheet <spreadsheetId>
-relay fetch sheet <spreadsheetId> "Sheet2!A1:D20"
-relay fetch sheet <spreadsheetId> --push --target github
-
-# Google Meet (list recent meetings)
-relay fetch meet --list
-relay fetch meet <conferenceId> --push
-```
-
-Also available in the web dashboard via the "Import from Google" button.
-
-### Create issues
-
-```bash
-relay parse meeting.txt | jq '.tickets' | relay create
-relay create tickets.json
-relay create --title "Fix login bug" --description "Session expires" --priority 2
-echo '{"title":"Fix bug","priority":1}' | relay create --target github
-```
-
-### History
+View and manage parsing history.
 
 ```bash
 relay history list --pretty
@@ -123,22 +132,25 @@ relay history get 0 --pretty
 relay history clear --yes
 ```
 
-## Web Dashboard
+### `relay dashboard`
+
+Launch the web UI for humans.
 
 ```bash
-relay dashboard
+relay dashboard                  # http://127.0.0.1:8000
 relay dashboard --port 3000
 ```
 
-Features:
-- Paste or upload transcript files (.txt, .md, .srt, .vtt)
-- Edit tickets before creating
-- Project and target selection
+Dashboard features:
+- Paste text or upload files (.txt, .md, .srt, .vtt, .csv)
+- Import from Google Docs and Sheets
+- Edit tickets (title, description, priority, labels) before creating
+- Project and target selection with context editor
 - History with creation status tracking
 
-## Configuration
+## Integration Backends
 
-### Integration backends
+Each integration auto-detects the best available backend:
 
 | Integration | CLI backend | API backend |
 |------------|-------------|-------------|
@@ -147,25 +159,23 @@ Features:
 | Linear (issues) | `lin` CLI (auto-detected) | GraphQL API via `LINEAR_API_KEY` |
 | Google Workspace (input) | `gws` CLI | — |
 
-### Environment variables
+### Environment Variables
 
 | Variable | Required for | Description |
 |----------|-------------|-------------|
-| `LINEAR_API_KEY` | Linear issues | [Linear API key](https://linear.app/settings/account/security) |
-| `LINEAR_TEAM_ID` | Linear issues | Linear team UUID (or set per-project) |
-| `GITHUB_TOKEN` | GitHub issues (API) | [GitHub token](https://github.com/settings/tokens) (not needed if `gh` CLI is installed) |
-| `GITHUB_REPO` | GitHub issues | `owner/repo` format (or set per-project, or auto-detected) |
+| `LINEAR_API_KEY` | Linear (API mode) | [Linear API key](https://linear.app/settings/account/security) |
+| `LINEAR_TEAM_ID` | Linear (API mode) | Linear team UUID (or set per-project) |
+| `GITHUB_TOKEN` | GitHub (API mode) | [GitHub token](https://github.com/settings/tokens) (not needed with `gh` CLI) |
+| `GITHUB_REPO` | GitHub | `owner/repo` (or per-project, or auto-detected from git) |
+
+Credentials load from `.env` (local) or `~/.relay-cli/.env` (global).
+Per-project targets are stored in `~/.relay-cli/projects/`.
 
 ## Uninstall
 
 ```bash
 npm uninstall -g @junu0723/relay
-```
-
-To also remove config, projects, and history:
-
-```bash
-rm -rf ~/.relay-cli
+rm -rf ~/.relay-cli   # remove config, projects, and history
 ```
 
 ## Development
@@ -174,7 +184,7 @@ rm -rf ~/.relay-cli
 git clone https://github.com/junu0723/relay-cli.git
 cd relay-cli
 npm install
-node bin/relay.js --help
+node bin/relay.js status
 node bin/relay.js dashboard
 ```
 
