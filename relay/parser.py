@@ -1,16 +1,16 @@
 import json
-import anthropic
-from relay.config import ANTHROPIC_API_KEY
+import shutil
+import subprocess
 
-SYSTEM_PROMPT = """너는 미팅/통화 transcript를 분석해서 Linear ticket으로 변환하는 전문가야.
+PROMPT = """You are an expert at analyzing meeting/call transcripts and converting them into Linear tickets.
 
-규칙:
-- 각 ticket은 서로 독립적이고 실행 가능한 단위로 분리
-- 중복 없이 mutually exclusive하게 분리
-- JSON array만 출력 (다른 말 하지 말 것)
-- transcript 언어와 동일한 언어로 ticket 작성
+Rules:
+- Each ticket must be an independently executable unit
+- Split into mutually exclusive items with no duplicates
+- Output ONLY a JSON array (no other text)
+- Write tickets in the same language as the transcript
 
-출력 형식:
+Output format:
 [
   {
     "title": "...",
@@ -20,26 +20,29 @@ SYSTEM_PROMPT = """너는 미팅/통화 transcript를 분석해서 Linear ticket
   }
 ]
 
-우선순위 기준:
-1 = 긴급 (서비스 장애, 데이터 유실 등)
-2 = 높음 (핵심 기능 버그, 중요 요청)
-3 = 보통 (개선사항, 일반 요청)
-4 = 낮음 (nice-to-have, 나중에 해도 되는 것)"""
+Priority levels:
+1 = Urgent (service outage, data loss, etc.)
+2 = High (critical bug, important request)
+3 = Medium (improvement, general request)
+4 = Low (nice-to-have, can be done later)
+
+transcript:
+"""
 
 
 def parse_transcript(transcript: str) -> list[dict]:
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-    message = client.messages.create(
-        model="claude-sonnet-4-6-20250514",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": f"transcript:\n{transcript}"}
-        ],
+    result = subprocess.run(
+        [shutil.which("claude") or "/Users/junu/.local/bin/claude", "-p", PROMPT + transcript, "--output-format", "text"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        stdin=subprocess.DEVNULL,
     )
 
-    raw = message.content[0].text.strip()
+    if result.returncode != 0:
+        raise RuntimeError(f"claude CLI error (code={result.returncode}): stderr={result.stderr.strip()} stdout={result.stdout.strip()}")
+
+    raw = result.stdout.strip()
     # Strip markdown code fences if present
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]

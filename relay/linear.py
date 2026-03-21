@@ -20,9 +20,9 @@ mutation CreateIssue($input: IssueCreateInput!) {
 
 def create_issue(ticket: dict) -> dict:
     if not LINEAR_API_KEY:
-        raise RuntimeError("LINEAR_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+        raise RuntimeError("LINEAR_API_KEY is not set. Check your .env file.")
     if not LINEAR_TEAM_ID:
-        raise RuntimeError("LINEAR_TEAM_ID가 설정되지 않았습니다. .env 파일을 확인하세요.")
+        raise RuntimeError("LINEAR_TEAM_ID is not set. Check your .env file.")
 
     variables = {
         "input": {
@@ -46,7 +46,7 @@ def create_issue(ticket: dict) -> dict:
     data = resp.json()
 
     if "errors" in data:
-        raise RuntimeError(f"Linear API 오류: {data['errors']}")
+        raise RuntimeError(f"Linear API error: {data['errors']}")
 
     issue = data["data"]["issueCreate"]["issue"]
     return {

@@ -1,9 +1,9 @@
 # relay-cli
 
-회의/통화 transcript를 AI가 분석해서 Linear issue로 자동 변환하는 도구.
+A tool that analyzes meeting/call transcripts with AI and automatically converts them into Linear issues.
 
 ```
-텍스트 (transcript) → Claude API (ticket 파싱) → Linear API (issue 생성) → 사람은 approve만
+Transcript → Claude CLI (parse into tickets) → Linear API (create issues) → Human just approves
 ```
 
 ## Setup
@@ -11,8 +11,10 @@
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# .env에 API 키 입력
+# Fill in API keys in .env
 ```
+
+Requires [Claude Code CLI](https://github.com/anthropics/claude-code) installed and authenticated.
 
 ## Run
 
@@ -20,14 +22,13 @@ cp .env.example .env
 uvicorn relay.main:app --reload --port 8000
 ```
 
-http://localhost:8000 에서 transcript 붙여넣기 → 분석 → Linear 생성.
+Open http://localhost:8000, paste a transcript, analyze, and create Linear issues.
 
 ## Environment Variables
 
-| 변수 | 설명 |
-|------|------|
-| `ANTHROPIC_API_KEY` | Anthropic API 키 |
-| `LINEAR_API_KEY` | Linear API 키 |
-| `LINEAR_TEAM_ID` | Linear 팀 ID |
+| Variable | Description |
+|----------|-------------|
+| `LINEAR_API_KEY` | Linear API key |
+| `LINEAR_TEAM_ID` | Linear team ID |
 
-`ANTHROPIC_API_KEY`만 있으면 transcript 파싱까지 테스트 가능. Linear 생성은 세 키 모두 필요.
+Transcript parsing works via Claude Code CLI (no API key needed). Linear issue creation requires both keys above.
