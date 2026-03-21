@@ -398,25 +398,59 @@ async function parseTranscript() {
   const startTime = Date.now();
   const timer = setInterval(() => {
     const sec = Math.floor((Date.now() - startTime) / 1000);
-    loadingText.textContent = sec < 10
-      ? 'Claude is analyzing...'
-      : 'Claude is analyzing... (' + sec + 's) — large inputs may take a while';
+    const base = 'Claude is analyzing... (' + sec + 's)';
+    loadingText.textContent = base;
   }, 1000);
 
   try {
-    const resp = await fetch('/api/parse', {
+    const resp = await fetch('/api/parse/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transcript, project: getProject() }),
     });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
 
-    tickets = data.tickets;
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = '';
+    let finalStats = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      sseBuffer += decoder.decode(value, { stream: true });
+
+      const lines = sseBuffer.split('\n');
+      sseBuffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const event = JSON.parse(line.slice(6));
+
+          if (event.type === 'progress') {
+            const sec = Math.floor((Date.now() - startTime) / 1000);
+            loadingText.textContent = 'Claude is analyzing... (' + sec + 's · ' + event.output_tokens + ' tokens)';
+          }
+
+          if (event.type === 'done') {
+            tickets = event.tickets;
+            finalStats = event.stats;
+          }
+
+          if (event.type === 'error') {
+            throw new Error(event.message);
+          }
+        } catch (e) {
+          if (e.message && !e.message.includes('JSON')) throw e;
+        }
+      }
+    }
+
+    if (!tickets.length && !finalStats) throw new Error('No result received');
+
     renderTickets();
-    if (data.stats) {
-      const s = data.stats;
-      document.getElementById('error').textContent = '';
+    if (finalStats) {
+      const s = finalStats;
       const statsEl = document.createElement('div');
       statsEl.style.cssText = 'color:var(--text-muted);font-size:0.8rem;margin-bottom:1rem';
       statsEl.textContent = (s.duration_ms / 1000).toFixed(1) + 's · ' +

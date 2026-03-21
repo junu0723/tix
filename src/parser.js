@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync, execSync, spawn } from 'child_process';
 import { getOpenIssues, getRepoInfo } from './github.js';
 
 const BASE_PROMPT = `You are an expert at converting any type of input into actionable tickets.
@@ -50,7 +50,6 @@ function buildContextBlock(project) {
   if (project.status) lines.push(`Current status: ${project.status}`);
   if (project.philosophy) lines.push(`Philosophy/principles:\n${project.philosophy}`);
 
-  // Fetch GitHub context if repo is connected
   const repo = project.github_repo;
   if (repo) {
     const issues = getOpenIssues(repo);
@@ -95,42 +94,37 @@ function findClaude() {
 
 const MAX_INPUT_CHARS = 30_000;
 
-export function parseTranscript(text, project = null) {
-  const claudePath = findClaude();
-
-  // Truncate overly long input
+function buildPrompt(text, project) {
   if (text.length > MAX_INPUT_CHARS) {
     text = text.slice(0, MAX_INPUT_CHARS) + '\n\n[... truncated, ' + (text.length - MAX_INPUT_CHARS) + ' chars omitted]';
   }
+  return buildContextBlock(project) + BASE_PROMPT + 'input:\n' + text;
+}
 
-  const contextBlock = buildContextBlock(project);
-  const fullPrompt = contextBlock + BASE_PROMPT + 'input:\n' + text;
-
-  const output = execFileSync(claudePath, [
-    '-p', fullPrompt,
-    '--output-format', 'json',
-  ], {
-    encoding: 'utf8',
-    timeout: 300_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  const claudeResult = JSON.parse(output);
-  let raw = (claudeResult.result || '').trim();
-
-  // Strip markdown code fences
+function extractTickets(raw) {
   if (raw.includes('```')) {
     const match = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
     if (match) raw = match[1].trim();
   }
-  // Extract JSON array if Claude added extra text
   if (!raw.startsWith('[')) {
     const start = raw.indexOf('[');
     const end = raw.lastIndexOf(']');
     if (start !== -1 && end !== -1) raw = raw.slice(start, end + 1);
   }
+  return JSON.parse(raw);
+}
 
-  const tickets = JSON.parse(raw);
+// Synchronous version (for CLI)
+export function parseTranscript(text, project = null) {
+  const claudePath = findClaude();
+  const fullPrompt = buildPrompt(text, project);
+
+  const output = execFileSync(claudePath, [
+    '-p', fullPrompt, '--output-format', 'json',
+  ], { encoding: 'utf8', timeout: 300_000, stdio: ['pipe', 'pipe', 'pipe'] });
+
+  const claudeResult = JSON.parse(output);
+  const tickets = extractTickets((claudeResult.result || '').trim());
 
   const stats = {
     duration_ms: claudeResult.duration_ms || 0,
@@ -140,4 +134,69 @@ export function parseTranscript(text, project = null) {
   };
 
   return { tickets, stats };
+}
+
+// Streaming version (for dashboard SSE)
+export function parseTranscriptStream(text, project = null, onEvent) {
+  return new Promise((resolve, reject) => {
+    const claudePath = findClaude();
+    const fullPrompt = buildPrompt(text, project);
+
+    const proc = spawn(claudePath, [
+      '-p', fullPrompt, '--output-format', 'stream-json', '--verbose',
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let buffer = '';
+    let outputTokens = 0;
+    let resultData = null;
+
+    proc.stdout.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+
+          if (event.type === 'assistant' && event.message?.usage) {
+            outputTokens = event.message.usage.output_tokens || outputTokens;
+            onEvent({
+              type: 'progress',
+              output_tokens: outputTokens,
+              input_tokens: event.message.usage.input_tokens || 0,
+            });
+          }
+
+          if (event.type === 'result') {
+            resultData = event;
+          }
+        } catch {}
+      }
+    });
+
+    proc.on('close', (code) => {
+      if (!resultData) {
+        reject(new Error('Claude CLI exited without result (code ' + code + ')'));
+        return;
+      }
+
+      try {
+        const tickets = extractTickets((resultData.result || '').trim());
+        const stats = {
+          duration_ms: resultData.duration_ms || 0,
+          input_tokens: resultData.usage?.input_tokens || 0,
+          output_tokens: resultData.usage?.output_tokens || 0,
+          cost_usd: resultData.total_cost_usd || 0,
+        };
+        onEvent({ type: 'done', tickets, stats });
+        resolve({ tickets, stats });
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    proc.on('error', reject);
+  });
 }
