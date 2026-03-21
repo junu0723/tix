@@ -1,6 +1,6 @@
 {
   "name": "@junu0723/tix",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AI-powered CLI that turns any text into actionable Linear or GitHub issues",
   "type": "module",
   "bin": {
@@ -9,7 +9,9 @@
   "files": [
     "bin/",
     "src/",
-    "static/"
+    "static/",
+    "tix/",
+    "README.md"
   ],
   "engines": {
     "node": ">=18.0.0"
