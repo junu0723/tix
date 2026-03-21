@@ -1,9 +1,9 @@
 # relay-cli
 
-A tool that analyzes meeting/call transcripts with AI and automatically converts them into Linear issues.
+A tool that analyzes meeting/call transcripts with AI and automatically converts them into Linear or GitHub issues.
 
 ```
-Transcript → Claude AI (parse into tickets) → Linear API (create issues) → Human just approves
+Transcript → Claude AI (parse into tickets) → Linear / GitHub (create issues) → Human just approves
 ```
 
 ## Install
@@ -20,14 +20,19 @@ pip install git+https://github.com/junu0723/relay-cli.git
 ## Setup
 
 ```bash
-# Interactive
+# Interactive (prompts for all credentials)
 relay setup
 
-# Non-interactive (for scripts / AI agents)
+# Linear only
 relay setup --linear-api-key lin_api_xxx --linear-team-id your-team-uuid
 
-# Save globally (~/.relay-cli/.env)
-relay setup --global --linear-api-key lin_api_xxx --linear-team-id your-team-uuid
+# GitHub only
+relay setup --github-token ghp_xxx --github-repo owner/repo
+
+# Both, saved globally (~/.relay-cli/.env)
+relay setup --global \
+  --linear-api-key lin_api_xxx --linear-team-id uuid \
+  --github-token ghp_xxx --github-repo owner/repo
 ```
 
 Check your configuration:
@@ -39,6 +44,7 @@ relay status
 ## CLI Usage
 
 All commands output structured JSON to stdout. Status messages go to stderr.
+Use `--target linear` (default) or `--target github` to choose where issues are created.
 
 ### Parse transcripts
 
@@ -52,8 +58,11 @@ cat meeting.txt | relay parse
 # Direct text input
 relay parse --text "We need to fix the login bug by Friday"
 
-# Parse and immediately create in Linear
+# Parse and create in Linear
 relay parse meeting.txt --push
+
+# Parse and create as GitHub issues
+relay parse meeting.txt --push --target github
 
 # Pretty-print JSON
 relay parse meeting.txt --pretty
@@ -62,11 +71,14 @@ relay parse meeting.txt --pretty
 relay parse meeting.txt --human
 ```
 
-### Create Linear issues
+### Create issues
 
 ```bash
 # Pipe from parse output
 relay parse meeting.txt | jq '.tickets' | relay create
+
+# Create as GitHub issues
+relay parse meeting.txt | jq '.tickets' | relay create --target github
 
 # From a JSON file
 relay create tickets.json
@@ -75,7 +87,7 @@ relay create tickets.json
 relay create --title "Fix login bug" --description "Session expires" --priority 2 --labels "bug,backend"
 
 # Single ticket via stdin
-echo '{"title":"Fix bug","priority":1}' | relay create
+echo '{"title":"Fix bug","priority":1}' | relay create --target github
 ```
 
 ### History
@@ -106,18 +118,18 @@ Features:
 - Paste or upload transcript files (.txt, .md, .srt, .vtt)
 - Edit tickets (title, description, priority, labels) before creating
 - Create issues in Linear individually or in bulk
-- History with Linear creation status tracking
+- History with creation status tracking
 
 ## Configuration
 
 | Variable | Required for | Description |
 |----------|-------------|-------------|
-| `LINEAR_API_KEY` | Issue creation | [Linear API key](https://linear.app/settings/account/security) |
-| `LINEAR_TEAM_ID` | Issue creation | Linear team UUID |
+| `LINEAR_API_KEY` | Linear issues | [Linear API key](https://linear.app/settings/account/security) |
+| `LINEAR_TEAM_ID` | Linear issues | Linear team UUID |
+| `GITHUB_TOKEN` | GitHub issues | [GitHub personal access token](https://github.com/settings/tokens) |
+| `GITHUB_REPO` | GitHub issues | Repository in `owner/repo` format |
 
 Transcript parsing uses Claude Code CLI — no additional API key needed.
-Linear issue creation requires both variables above.
-
 Credentials are loaded from `.env` (local) or `~/.relay-cli/.env` (global).
 
 ## Uninstall

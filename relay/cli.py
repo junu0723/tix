@@ -3,15 +3,29 @@ import json
 import click
 from pathlib import Path
 from relay.parser import parse_transcript
-from relay.linear import create_issue
+from relay.linear import create_issue as linear_create
+from relay.github import create_issue as github_create
 from relay.history import add_entry, get_entries, update_entry
-from relay.config import LINEAR_API_KEY, LINEAR_TEAM_ID
+from relay.config import LINEAR_API_KEY, LINEAR_TEAM_ID, GITHUB_TOKEN, GITHUB_REPO
 
 ENV_FILE = Path.cwd() / ".env"
 GLOBAL_ENV = Path.home() / ".relay-cli" / ".env"
 
 PRIORITY_LABELS = {1: "Urgent", 2: "High", 3: "Medium", 4: "Low"}
 PRIORITY_COLORS = {1: "red", 2: "yellow", 3: "blue", 4: "white"}
+
+
+TARGETS = {
+    "linear": linear_create,
+    "github": github_create,
+}
+
+
+def _create_issue(ticket, target="linear"):
+    fn = TARGETS.get(target)
+    if not fn:
+        _error(f"Unknown target '{target}'. Choose: linear, github")
+    return fn(ticket)
 
 
 def _output(data, pretty=False):
@@ -28,25 +42,28 @@ def _error(message, code=1):
 @click.group()
 @click.version_option(version="0.1.0", prog_name="relay")
 def cli():
-    """relay — Convert meeting/call transcripts into Linear issues.
+    """relay — Convert meeting/call transcripts into Linear or GitHub issues.
 
     \b
     Designed for both human and AI agent usage.
     All commands output structured JSON to stdout.
     Status messages go to stderr (won't interfere with JSON parsing).
+    Supports Linear and GitHub Issues as output targets (--target flag).
 
     \b
     Quick start:
       relay setup --linear-api-key KEY --linear-team-id ID
+      relay setup --github-token TOKEN --github-repo owner/repo
       relay parse meeting.txt
       relay parse meeting.txt --push
+      relay parse meeting.txt --push --target github
       relay dashboard
 
     \b
     Commands:
-      setup      Configure Linear API credentials
+      setup      Configure API credentials (Linear / GitHub)
       parse      Parse transcript into tickets (file, stdin, or --text)
-      create     Create Linear issues from JSON input
+      create     Create issues from JSON input (Linear or GitHub)
       history    List, view, or clear parsing history
       status     Show current configuration status
       dashboard  Launch the web UI
@@ -59,9 +76,11 @@ def cli():
 @cli.command()
 @click.option("--linear-api-key", default=None, help="Linear API key (lin_api_...).")
 @click.option("--linear-team-id", default=None, help="Linear team UUID.")
+@click.option("--github-token", default=None, help="GitHub personal access token.")
+@click.option("--github-repo", default=None, help="GitHub repo (owner/repo format).")
 @click.option("--global", "use_global", is_flag=True, help="Save to ~/.relay-cli/.env instead of ./.env.")
-def setup(linear_api_key, linear_team_id, use_global):
-    """Configure API credentials.
+def setup(linear_api_key, linear_team_id, github_token, github_repo, use_global):
+    """Configure API credentials for Linear and/or GitHub.
 
     \b
     Saves credentials to a .env file. By default writes to ./.env
@@ -73,51 +92,65 @@ def setup(linear_api_key, linear_team_id, use_global):
       relay setup
 
     \b
-      # Non-interactive (for AI agents / scripts)
+      # Linear only (non-interactive)
       relay setup --linear-api-key lin_api_xxx --linear-team-id uuid-here
 
     \b
-      # Save globally
-      relay setup --global --linear-api-key lin_api_xxx --linear-team-id uuid-here
-    """
-    target = GLOBAL_ENV if use_global else ENV_FILE
+      # GitHub only
+      relay setup --github-token ghp_xxx --github-repo owner/repo
 
-    # Load existing values
+    \b
+      # Both targets, saved globally
+      relay setup --global \\
+        --linear-api-key lin_api_xxx --linear-team-id uuid \\
+        --github-token ghp_xxx --github-repo owner/repo
+    """
+    env_target = GLOBAL_ENV if use_global else ENV_FILE
+
     existing = {}
-    if target.exists():
-        for line in target.read_text().splitlines():
+    if env_target.exists():
+        for line in env_target.read_text().splitlines():
             if "=" in line and not line.startswith("#"):
                 k, v = line.split("=", 1)
                 existing[k.strip()] = v.strip()
 
-    # Prompt if not provided via flags
-    if linear_api_key is None:
-        linear_api_key = click.prompt(
-            "LINEAR_API_KEY",
-            default=existing.get("LINEAR_API_KEY", ""),
-            show_default=True,
-        )
-    if linear_team_id is None:
-        linear_team_id = click.prompt(
-            "LINEAR_TEAM_ID",
-            default=existing.get("LINEAR_TEAM_ID", ""),
-            show_default=True,
-        )
+    all_none = all(v is None for v in [linear_api_key, linear_team_id, github_token, github_repo])
 
-    existing["LINEAR_API_KEY"] = linear_api_key
-    existing["LINEAR_TEAM_ID"] = linear_team_id
+    if all_none or linear_api_key is not None or linear_team_id is not None:
+        if linear_api_key is None and all_none:
+            linear_api_key = click.prompt("LINEAR_API_KEY", default=existing.get("LINEAR_API_KEY", ""), show_default=True)
+        if linear_team_id is None and all_none:
+            linear_team_id = click.prompt("LINEAR_TEAM_ID", default=existing.get("LINEAR_TEAM_ID", ""), show_default=True)
 
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        "\n".join(f"{k}={v}" for k, v in existing.items()) + "\n"
-    )
+    if all_none or github_token is not None or github_repo is not None:
+        if github_token is None and all_none:
+            github_token = click.prompt("GITHUB_TOKEN", default=existing.get("GITHUB_TOKEN", ""), show_default=True)
+        if github_repo is None and all_none:
+            github_repo = click.prompt("GITHUB_REPO", default=existing.get("GITHUB_REPO", ""), show_default=True)
 
-    _output({
-        "ok": True,
-        "file": str(target),
-        "linear_api_key": linear_api_key[:12] + "..." if len(linear_api_key) > 12 else "(empty)",
-        "linear_team_id": linear_team_id or "(empty)",
-    }, pretty=True)
+    if linear_api_key is not None:
+        existing["LINEAR_API_KEY"] = linear_api_key
+    if linear_team_id is not None:
+        existing["LINEAR_TEAM_ID"] = linear_team_id
+    if github_token is not None:
+        existing["GITHUB_TOKEN"] = github_token
+    if github_repo is not None:
+        existing["GITHUB_REPO"] = github_repo
+
+    env_target.parent.mkdir(parents=True, exist_ok=True)
+    env_target.write_text("\n".join(f"{k}={v}" for k, v in existing.items()) + "\n")
+
+    result = {"ok": True, "file": str(env_target)}
+    if existing.get("LINEAR_API_KEY"):
+        result["linear_api_key"] = existing["LINEAR_API_KEY"][:12] + "..."
+    if existing.get("LINEAR_TEAM_ID"):
+        result["linear_team_id"] = existing["LINEAR_TEAM_ID"]
+    if existing.get("GITHUB_TOKEN"):
+        result["github_token"] = existing["GITHUB_TOKEN"][:12] + "..."
+    if existing.get("GITHUB_REPO"):
+        result["github_repo"] = existing["GITHUB_REPO"]
+
+    _output(result, pretty=True)
 
 
 # ── status ─────────────────────────────────────────────────────────────
@@ -145,6 +178,8 @@ def status():
     _output({
         "linear_api_key": (LINEAR_API_KEY[:12] + "...") if LINEAR_API_KEY else None,
         "linear_team_id": LINEAR_TEAM_ID or None,
+        "github_token": (GITHUB_TOKEN[:12] + "...") if GITHUB_TOKEN else None,
+        "github_repo": GITHUB_REPO or None,
         "claude_cli": claude_path,
         "env_files": {
             "local": str(ENV_FILE) if local_env else None,
@@ -152,7 +187,8 @@ def status():
         },
         "ready": {
             "parse": bool(claude_path),
-            "create": bool(LINEAR_API_KEY and LINEAR_TEAM_ID),
+            "linear": bool(LINEAR_API_KEY and LINEAR_TEAM_ID),
+            "github": bool(GITHUB_TOKEN and GITHUB_REPO),
         },
     }, pretty=True)
 
@@ -162,11 +198,12 @@ def status():
 @cli.command()
 @click.argument("file", type=click.File("r"), default="-", required=False)
 @click.option("--text", default=None, help="Pass transcript text directly as a string.")
-@click.option("--push", is_flag=True, help="Create issues in Linear immediately after parsing.")
+@click.option("--push", is_flag=True, help="Create issues immediately after parsing.")
+@click.option("--target", type=click.Choice(["linear", "github"]), default="linear", help="Target platform for --push (default: linear).")
 @click.option("--pretty", is_flag=True, help="Pretty-print JSON output.")
 @click.option("--human", is_flag=True, help="Human-readable output instead of JSON.")
-def parse(file, text, push, pretty, human):
-    """Parse a transcript into Linear tickets.
+def parse(file, text, push, target, pretty, human):
+    """Parse a transcript into tickets.
 
     \b
     Reads transcript from a file, stdin, or --text flag.
@@ -188,6 +225,10 @@ def parse(file, text, push, pretty, human):
     \b
       # Parse and create in Linear
       relay parse meeting.txt --push
+
+    \b
+      # Parse and create as GitHub issues
+      relay parse meeting.txt --push --target github
 
     \b
       # Human-readable output
@@ -225,20 +266,20 @@ def parse(file, text, push, pretty, human):
     if human:
         _print_tickets_human(tickets)
         if push:
-            click.confirm("Create these issues in Linear?", abort=True)
-            _push_tickets_human(tickets)
+            click.confirm(f"Create these issues in {target}?", abort=True)
+            _push_tickets_human(tickets, target)
         else:
-            click.echo("Use --push to create these in Linear.", err=True)
+            click.echo("Use --push to create issues.", err=True)
         return
 
-    result = {"tickets": tickets, "count": len(tickets), "source": source}
+    result = {"tickets": tickets, "count": len(tickets), "source": source, "target": target}
 
     if push:
         created = []
         for t in tickets:
-            issue = create_issue(t)
-            t["linearId"] = issue["id"]
-            t["linearUrl"] = issue["url"]
+            issue = _create_issue(t, target)
+            t["issueId"] = issue["id"]
+            t["issueUrl"] = issue["url"]
             created.append(issue)
             click.echo(f"Created {issue['id']}", err=True)
         result["created"] = created
@@ -254,9 +295,10 @@ def parse(file, text, push, pretty, human):
 @click.option("--description", default=None, help="Ticket description.")
 @click.option("--priority", type=int, default=None, help="Priority 1-4 (1=Urgent, 4=Low).")
 @click.option("--labels", default=None, help="Comma-separated labels.")
+@click.option("--target", type=click.Choice(["linear", "github"]), default="linear", help="Target platform (default: linear).")
 @click.option("--pretty", is_flag=True, help="Pretty-print JSON output.")
-def create(input, title, description, priority, labels, pretty):
-    """Create Linear issues from JSON or flags.
+def create(input, title, description, priority, labels, target, pretty):
+    """Create issues in Linear or GitHub from JSON or flags.
 
     \b
     Accepts input in three ways:
@@ -318,7 +360,7 @@ def create(input, title, description, priority, labels, pretty):
 
     created = []
     for t in ticket_list:
-        issue = create_issue(t)
+        issue = _create_issue(t, target)
         created.append(issue)
         click.echo(f"Created {issue['id']}: {issue['title']}", err=True)
 
@@ -461,9 +503,9 @@ def _print_tickets_human(tickets):
         click.echo()
 
 
-def _push_tickets_human(tickets):
+def _push_tickets_human(tickets, target="linear"):
     for t in tickets:
-        result = create_issue(t)
+        result = _create_issue(t, target)
         click.echo(click.style(f"  Created {result['id']}", fg="green") + f" — {result['title']}")
         click.echo(click.style(f"  {result['url']}", dim=True))
 
