@@ -414,6 +414,15 @@ async function parseTranscript() {
 
     tickets = data.tickets;
     renderTickets();
+    if (data.stats) {
+      const s = data.stats;
+      document.getElementById('error').textContent = '';
+      const statsEl = document.createElement('div');
+      statsEl.style.cssText = 'color:var(--text-muted);font-size:0.8rem;margin-bottom:1rem';
+      statsEl.textContent = (s.duration_ms / 1000).toFixed(1) + 's · ' +
+        (s.input_tokens + s.output_tokens) + ' tokens · $' + s.cost_usd.toFixed(4);
+      document.getElementById('results').prepend(statsEl);
+    }
   } catch (e) {
     error.textContent = 'Error: ' + e.message;
   } finally {

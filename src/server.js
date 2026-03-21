@@ -31,9 +31,9 @@ export function startServer(host = '127.0.0.1', port = 8000) {
         const activeName = getActiveProjectName();
         if (activeName) proj = getProject(activeName);
       }
-      const tickets = parseTranscript(transcript, proj);
+      const { tickets, stats } = parseTranscript(transcript, proj);
       addEntry(tickets, 'dashboard');
-      res.json({ tickets });
+      res.json({ tickets, stats });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

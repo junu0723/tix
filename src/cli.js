@@ -236,9 +236,10 @@ Notes:
     if (proj) console.error(`Using project: ${proj.name}`);
 
     console.error('Analyzing...');
-    const tickets = parseTranscript(transcript, proj);
+    const { tickets, stats } = parseTranscript(transcript, proj);
     const source = opts.text ? 'text' : (file || 'stdin');
     addEntry(tickets, source);
+    console.error(`Done in ${(stats.duration_ms / 1000).toFixed(1)}s · ${stats.input_tokens + stats.output_tokens} tokens · $${stats.cost_usd.toFixed(4)}`);
 
     if (opts.human) {
       printTicketsHuman(tickets);
@@ -251,7 +252,7 @@ Notes:
       return;
     }
 
-    const result = { tickets, count: tickets.length, source, target: opts.target };
+    const result = { tickets, count: tickets.length, source, target: opts.target, stats };
     if (proj) result.project = proj.name;
 
     if (opts.push) {
@@ -581,8 +582,9 @@ async function parseAndOutput(text, source, opts) {
   if (proj) console.error(`Using project: ${proj.name}`);
 
   console.error('Analyzing...');
-  const tickets = parseTranscript(text, proj);
+  const { tickets, stats } = parseTranscript(text, proj);
   addEntry(tickets, source);
+  console.error(`Done in ${(stats.duration_ms / 1000).toFixed(1)}s · ${stats.input_tokens + stats.output_tokens} tokens · $${stats.cost_usd.toFixed(4)}`);
 
   if (opts.human) {
     printTicketsHuman(tickets);
@@ -593,7 +595,7 @@ async function parseAndOutput(text, source, opts) {
     return;
   }
 
-  const result = { tickets, count: tickets.length, source, target: opts.target };
+  const result = { tickets, count: tickets.length, source, target: opts.target, stats };
   if (proj) result.project = proj.name;
 
   if (opts.push) {

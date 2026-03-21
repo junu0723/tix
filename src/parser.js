@@ -106,16 +106,18 @@ export function parseTranscript(text, project = null) {
   const contextBlock = buildContextBlock(project);
   const fullPrompt = contextBlock + BASE_PROMPT + 'input:\n' + text;
 
-  const result = execFileSync(claudePath, [
+  const output = execFileSync(claudePath, [
     '-p', fullPrompt,
-    '--output-format', 'text',
+    '--output-format', 'json',
   ], {
     encoding: 'utf8',
     timeout: 300_000,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
-  let raw = result.trim();
+  const claudeResult = JSON.parse(output);
+  let raw = (claudeResult.result || '').trim();
+
   // Strip markdown code fences
   if (raw.includes('```')) {
     const match = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
@@ -128,5 +130,14 @@ export function parseTranscript(text, project = null) {
     if (start !== -1 && end !== -1) raw = raw.slice(start, end + 1);
   }
 
-  return JSON.parse(raw);
+  const tickets = JSON.parse(raw);
+
+  const stats = {
+    duration_ms: claudeResult.duration_ms || 0,
+    input_tokens: claudeResult.usage?.input_tokens || 0,
+    output_tokens: claudeResult.usage?.output_tokens || 0,
+    cost_usd: claudeResult.total_cost_usd || 0,
+  };
+
+  return { tickets, stats };
 }
