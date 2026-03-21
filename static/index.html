@@ -209,7 +209,10 @@ select.edit-field { padding: 0.35rem 0.4rem; width: auto; }
 <div id="history-section" style="margin-top:3rem;border-top:1px solid var(--border);padding-top:2rem">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
     <h2 style="font-size:1.1rem">History</h2>
-    <button class="btn-secondary" onclick="loadHistory()" style="font-size:1.2rem;padding:0.2rem 0.5rem;line-height:1" title="Refresh">&#x21bb;</button>
+    <span style="display:flex;gap:0.3rem">
+      <button class="btn-secondary" onclick="loadHistory()" style="font-size:1.2rem;padding:0.2rem 0.5rem;line-height:1" title="Refresh">&#x21bb;</button>
+      <button class="btn-secondary" onclick="toggleDeleteMode()" id="deleteModeBtn" style="font-size:1rem;padding:0.2rem 0.5rem;line-height:1" title="Delete mode">&#x1f5d1;</button>
+    </span>
   </div>
   <div id="history-list" style="color:var(--text-muted);font-size:0.85rem">Loading...</div>
 </div>
@@ -548,13 +551,23 @@ async function loadHistory() {
       }).join('');
       return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.8rem;margin-bottom:0.5rem;cursor:pointer" onclick="restoreHistory(' + ei + ')">' +
         '<div style="display:flex;justify-content:space-between;align-items:center"><span>' + date + '</span><span style="display:flex;gap:0.5rem;align-items:center">' + badge +
-        '<button onclick="event.stopPropagation();deleteHistory(' + ei + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:0.1rem 0.3rem;line-height:1" title="Delete">&#x2715;</button></span></div>' +
+        '<button class="history-delete-btn" onclick="event.stopPropagation();deleteHistory(' + ei + ')" style="display:none;background:none;border:none;color:var(--p1);cursor:pointer;font-size:0.85rem;padding:0.1rem 0.3rem;line-height:1" title="Delete">&#x2715;</button></span></div>' +
         ticketSummary +
       '</div>';
     }).join('');
   } catch (e) {
     list.textContent = 'Failed to load history.';
   }
+}
+
+let deleteMode = false;
+
+function toggleDeleteMode() {
+  deleteMode = !deleteMode;
+  document.getElementById('deleteModeBtn').style.borderColor = deleteMode ? 'var(--p1)' : 'var(--border)';
+  document.querySelectorAll('.history-delete-btn').forEach(el => {
+    el.style.display = deleteMode ? 'inline' : 'none';
+  });
 }
 
 async function deleteHistory(ei) {
