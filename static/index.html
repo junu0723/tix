@@ -307,7 +307,6 @@ function updateProjectInfo() {
   if (proj.github_repo) parts.push('GitHub: ' + proj.github_repo);
   if (proj.linear_team_name) parts.push('Linear: ' + proj.linear_team_name);
   else if (proj.linear_team_id) parts.push('Linear: ' + proj.linear_team_id.slice(0, 8) + '...');
-  if (proj.description) parts.push(proj.description);
   info.textContent = parts.join(' · ') || 'Click to configure';
 
   // Populate context fields
