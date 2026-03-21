@@ -93,8 +93,15 @@ function findClaude() {
   }
 }
 
+const MAX_INPUT_CHARS = 30_000;
+
 export function parseTranscript(text, project = null) {
   const claudePath = findClaude();
+
+  // Truncate overly long input
+  if (text.length > MAX_INPUT_CHARS) {
+    text = text.slice(0, MAX_INPUT_CHARS) + '\n\n[... truncated, ' + (text.length - MAX_INPUT_CHARS) + ' chars omitted]';
+  }
 
   const contextBlock = buildContextBlock(project);
   const fullPrompt = contextBlock + BASE_PROMPT + 'input:\n' + text;
@@ -104,7 +111,7 @@ export function parseTranscript(text, project = null) {
     '--output-format', 'text',
   ], {
     encoding: 'utf8',
-    timeout: 120_000,
+    timeout: 300_000,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

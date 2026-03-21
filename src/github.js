@@ -9,7 +9,7 @@ export function getOpenIssues(repo = null) {
   try {
     const result = execFileSync('gh', [
       'issue', 'list', '--repo', repo, '--state', 'open',
-      '--json', 'number,title,labels,state', '--limit', '50',
+      '--json', 'number,title,labels,state', '--limit', '20',
     ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 });
     return JSON.parse(result);
   } catch {
