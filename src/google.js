@@ -18,10 +18,21 @@ export function hasGwsCli() {
   }
 }
 
-export function fetchDoc(docId) {
-  const data = gws(['documents', 'get', '--params', JSON.stringify({ documentId: docId })]);
+function getSheetNames(spreadsheetId) {
+  try {
+    const data = gws([
+      'sheets', 'spreadsheets', 'get',
+      '--params', JSON.stringify({ spreadsheetId, fields: 'sheets.properties.title' }),
+    ]);
+    return (data.sheets || []).map(s => s.properties.title);
+  } catch {
+    return [];
+  }
+}
 
-  // Extract text from doc body
+export function fetchDoc(docId) {
+  const data = gws(['docs', 'documents', 'get', '--params', JSON.stringify({ documentId: docId })]);
+
   const content = data.body?.content || [];
   const text = content
     .flatMap(block => {
@@ -46,24 +57,28 @@ export function fetchDoc(docId) {
   return { title: data.title || '', text: text.trim() };
 }
 
-export function fetchSheet(spreadsheetId, range = 'Sheet1') {
+export function fetchSheet(spreadsheetId, range = null) {
+  // If no range specified, use first sheet name
+  if (!range) {
+    const names = getSheetNames(spreadsheetId);
+    range = names.length > 0 ? names[0] : 'Sheet1';
+  }
+
   const data = gws([
-    'spreadsheets', 'values', 'get',
+    'sheets', 'spreadsheets', 'values', 'get',
     '--params', JSON.stringify({ spreadsheetId, range }),
   ]);
 
   const rows = data.values || [];
-  if (rows.length === 0) return { title: '', text: '' };
+  if (rows.length === 0) return { title: range, text: '' };
 
-  // Convert to readable table
   const text = rows.map(row => row.join('\t')).join('\n');
   return { title: range, text };
 }
 
 export function fetchMeetTranscripts() {
-  // List recent conference records
   const data = gws([
-    'conferenceRecords', 'list',
+    'meet', 'conferenceRecords', 'list',
     '--params', JSON.stringify({ pageSize: 10 }),
   ]);
 
@@ -76,19 +91,17 @@ export function fetchMeetTranscripts() {
 }
 
 export function fetchMeetTranscript(conferenceName) {
-  // List transcripts for a conference
   const data = gws([
-    'conferenceRecords', 'transcripts', 'list',
+    'meet', 'conferenceRecords', 'transcripts', 'list',
     '--params', JSON.stringify({ parent: conferenceName }),
   ]);
 
   const transcripts = data.transcripts || [];
   if (transcripts.length === 0) return null;
 
-  // Get transcript entries
   const transcript = transcripts[0];
   const entries = gws([
-    'conferenceRecords', 'transcripts', 'entries', 'list',
+    'meet', 'conferenceRecords', 'transcripts', 'entries', 'list',
     '--params', JSON.stringify({ parent: transcript.name }),
     '--page-all',
   ]);

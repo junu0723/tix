@@ -96,7 +96,7 @@ export function startServer(host = '127.0.0.1', port = 8000) {
         text = doc.text;
         source = `gdoc:${id}`;
       } else if (type === 'sheet') {
-        const sheet = fetchSheet(id, range || 'Sheet1');
+        const sheet = fetchSheet(id, range || null);
         text = sheet.text;
         source = `gsheet:${id}`;
       } else {

@@ -544,7 +544,7 @@ fetch
   .action(async (spreadsheetId, range, opts) => {
     const { fetchSheet } = await import('./google.js');
     console.error(`Fetching Google Sheet...`);
-    const sheet = fetchSheet(spreadsheetId, range || 'Sheet1');
+    const sheet = fetchSheet(spreadsheetId, range || null);
     console.error(`Got: ${sheet.text.split('\n').length} rows`);
     await parseAndOutput(sheet.text, `gsheet:${spreadsheetId}`, opts);
   });
