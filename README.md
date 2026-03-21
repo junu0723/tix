@@ -9,8 +9,17 @@ Transcript → Claude AI (parse into tickets) → Linear / GitHub (create issues
 ## Install
 
 ```bash
+# Recommended (manages its own venv automatically)
+pipx install git+https://github.com/junu0723/relay-cli.git
+
+# Or with uv
+uv tool install git+https://github.com/junu0723/relay-cli.git
+
+# Or with pip (inside a venv)
 pip install git+https://github.com/junu0723/relay-cli.git
 ```
+
+If you don't have `pipx` yet: `brew install pipx` (macOS) or `apt install pipx` (Linux).
 
 ### Prerequisites
 
@@ -176,7 +185,8 @@ Per-project targets are stored in `~/.relay-cli/projects/`.
 ## Uninstall
 
 ```bash
-pip uninstall relay-cli
+pipx uninstall relay-cli
+# or: pip uninstall relay-cli
 ```
 
 To also remove config, projects, and history:
