@@ -41,6 +41,28 @@ async function gql(query, variables = {}) {
   return data;
 }
 
+export async function getTeamIssues(teamId = null) {
+  if (!LINEAR_API_KEY) return [];
+  const team = teamId || LINEAR_TEAM_ID;
+  if (!team) return [];
+  try {
+    const data = await gql(`{
+      team(id: "${team}") {
+        issues(first: 50, filter: { state: { type: { nin: ["completed","canceled"] } } }) {
+          nodes { id identifier title url }
+        }
+      }
+    }`);
+    return (data.data.team.issues.nodes || []).map(i => ({
+      id: i.identifier,
+      title: i.title,
+      url: i.url,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getTeams() {
   if (!LINEAR_API_KEY) return [];
   try {

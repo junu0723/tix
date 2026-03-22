@@ -8,8 +8,9 @@ import chalk from 'chalk';
 
 import { LINEAR_API_KEY, LINEAR_TEAM_ID, GITHUB_TOKEN, GITHUB_REPO } from './config.js';
 import { parseTranscript } from './parser.js';
-import { createIssue as linearCreate } from './linear.js';
-import { createIssue as githubCreate, detectRepo } from './github.js';
+import { createIssue as linearCreate, getTeamIssues } from './linear.js';
+import { createIssue as githubCreate, detectRepo, getOpenIssues } from './github.js';
+import { checkDuplicates } from './dedup.js';
 import { addEntry, getEntries, clearHistory } from './history.js';
 import {
   createProject, getProject, listProjects, deleteProject,
@@ -40,6 +41,19 @@ async function createIssue(ticket, target, project) {
     return githubCreate(ticket, repo || undefined);
   }
   error(`Unknown target '${target}'. Choose: linear, github`);
+}
+
+async function fetchExistingIssues(target, project) {
+  try {
+    if (target === 'github') {
+      return getOpenIssues(project?.github_repo);
+    } else if (target === 'linear') {
+      return await getTeamIssues(project?.linear_team_id);
+    }
+  } catch {
+    return [];
+  }
+  return [];
 }
 
 function readInput(filePath) {
@@ -189,6 +203,7 @@ program
   .option('--text <text>', 'Pass text directly as a string instead of file/stdin')
   .option('--push', 'Create issues in target platform immediately after parsing')
   .option('--target <target>', 'Target platform: linear or github (default: linear)', 'linear')
+  .option('--skip-dedup', 'Skip duplicate issue checking when pushing')
   .option('--pretty', 'Pretty-print JSON output with indentation')
   .option('--human', 'Human-readable colored output instead of JSON')
   .addHelpText('after', `
@@ -235,12 +250,33 @@ Notes:
     addEntry(tickets, source);
     console.error(`Done in ${(stats.duration_ms / 1000).toFixed(1)}s · ${stats.input_tokens + stats.output_tokens} tokens · $${stats.cost_usd.toFixed(4)}`);
 
+    // Dedup check before push
+    let ticketsToCreate = tickets;
+    let dupResult = { unique: tickets, duplicates: [] };
+    if (opts.push && !opts.skipDedup) {
+      console.error('Checking for duplicates...');
+      const existing = await fetchExistingIssues(opts.target, proj);
+      if (existing.length > 0) {
+        dupResult = checkDuplicates(tickets, existing);
+        ticketsToCreate = dupResult.unique;
+        if (dupResult.duplicates.length > 0) {
+          console.error(chalk.yellow(`  ${dupResult.duplicates.length} duplicate(s) found — skipping:`));
+          for (const d of dupResult.duplicates) {
+            console.error(chalk.yellow(`    "${d.ticket.title}" ≈ ${d.matchedIssue.id || ''} "${d.matchedIssue.title}"`));
+          }
+        }
+      }
+    }
+
     if (opts.human) {
       printTicketsHuman(tickets);
-      if (opts.push) {
-        await confirm(`Create these issues in ${opts.target}?`);
-        await pushTicketsHuman(tickets, opts.target, proj);
-      } else {
+      if (dupResult.duplicates.length > 0) {
+        console.error(chalk.yellow(`\n${dupResult.duplicates.length} ticket(s) skipped as duplicates.`));
+      }
+      if (opts.push && ticketsToCreate.length > 0) {
+        await confirm(`Create ${ticketsToCreate.length} issue(s) in ${opts.target}?`);
+        await pushTicketsHuman(ticketsToCreate, opts.target, proj);
+      } else if (!opts.push) {
         console.error('Use --push to create issues.');
       }
       return;
@@ -248,10 +284,16 @@ Notes:
 
     const result = { tickets, count: tickets.length, source, target: opts.target, stats };
     if (proj) result.project = proj.name;
+    if (dupResult.duplicates.length > 0) {
+      result.duplicates = dupResult.duplicates.map(d => ({
+        ticket: d.ticket.title,
+        matchedIssue: d.matchedIssue,
+      }));
+    }
 
     if (opts.push) {
       const created = [];
-      for (const t of tickets) {
+      for (const t of ticketsToCreate) {
         const issue = await createIssue(t, opts.target, proj);
         t.issueId = issue.id;
         t.issueUrl = issue.url;
@@ -274,6 +316,7 @@ program
   .option('--priority <n>', 'Priority 1-4 (1=Urgent, 2=High, 3=Medium, 4=Low)', parseInt)
   .option('--labels <labels>', 'Comma-separated labels (e.g. "bug,frontend")')
   .option('--target <target>', 'Target platform: linear or github (default: linear)', 'linear')
+  .option('--skip-dedup', 'Skip duplicate issue checking')
   .option('--pretty', 'Pretty-print JSON output')
   .addHelpText('after', `
 Input: JSON via stdin, file, or --title flag. Accepts:
@@ -317,14 +360,37 @@ Output (JSON to stdout):
     }
 
     const proj = getActiveProject();
-    const created = [];
-    for (const t of ticketList) {
-      const issue = await createIssue(t, opts.target, proj);
-      created.push(issue);
-      console.error(`Created ${issue.id}: ${issue.title}`);
+
+    let toCreate = ticketList;
+    const result = { created: [], count: 0 };
+
+    if (!opts.skipDedup) {
+      console.error('Checking for duplicates...');
+      const existing = await fetchExistingIssues(opts.target, proj);
+      if (existing.length > 0) {
+        const { unique, duplicates } = checkDuplicates(ticketList, existing);
+        toCreate = unique;
+        if (duplicates.length > 0) {
+          console.error(chalk.yellow(`  ${duplicates.length} duplicate(s) found — skipping:`));
+          for (const d of duplicates) {
+            console.error(chalk.yellow(`    "${d.ticket.title}" ≈ ${d.matchedIssue.id || ''} "${d.matchedIssue.title}"`));
+          }
+          result.duplicates = duplicates.map(d => ({
+            ticket: d.ticket.title,
+            matchedIssue: d.matchedIssue,
+          }));
+        }
+      }
     }
 
-    output({ created, count: created.length }, opts.pretty);
+    for (const t of toCreate) {
+      const issue = await createIssue(t, opts.target, proj);
+      result.created.push(issue);
+      console.error(`Created ${issue.id}: ${issue.title}`);
+    }
+    result.count = result.created.length;
+
+    output(result, opts.pretty);
   });
 
 // ── history ────────────────────────────────────────────────────────────
