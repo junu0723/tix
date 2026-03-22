@@ -7,7 +7,6 @@ Feed it meeting transcripts, notes, braindumps, to-do lists — it extracts acti
 ## Try It
 
 ```bash
-# No install needed
 npx @junu0723/tix parse --text "Fix the login bug by Friday, add dark mode support" --human
 ```
 
@@ -23,10 +22,9 @@ tix --help
 - Node.js 18+
 - [Claude Code CLI](https://github.com/anthropics/claude-code) — used for AI-powered parsing
 
-### Optional (auto-detected)
+### Optional
 
 - [GitHub CLI (`gh`)](https://cli.github.com/) — create GitHub issues without a token
-- [Linear CLI (`lin`)](https://www.npmjs.com/package/@linear/cli) — create Linear issues without an API key
 
 ## Quick Start
 
@@ -56,9 +54,9 @@ All commands output structured JSON to stdout. Status messages go to stderr.
 
 ### `tix parse`
 
-Parse any text into tickets. Accepts transcripts, notes, to-do lists, braindumps, docs, spreadsheet data — anything with actionable items.
+Parse any text into tickets. Accepts transcripts, notes, to-do lists, braindumps — anything with actionable items.
 
-When a project is active, its context (description, stack, status, philosophy) and existing GitHub issues are injected into the prompt. Claude generates project-specific tickets, checks for duplicates, and aligns priorities with your project's goals.
+When a project is active, its context (description, stack, status, philosophy) is used for smarter ticket generation. Duplicate issues are automatically checked before creation.
 
 ```bash
 tix parse meeting.txt                        # from file
@@ -66,11 +64,12 @@ cat notes.md | tix parse                     # from stdin
 tix parse --text "Fix the login bug"         # inline text
 tix parse meeting.txt --push                 # parse + create in Linear
 tix parse meeting.txt --push --target github # parse + create in GitHub
+tix parse meeting.txt --push --skip-dedup    # skip duplicate check
 tix parse meeting.txt --pretty               # pretty JSON output
 tix parse meeting.txt --human                # human-readable output
 ```
 
-Output includes analysis stats (duration, tokens, cost):
+Output includes analysis stats:
 ```json
 {
   "tickets": [{ "title": "...", "description": "...", "priority": 1, "labels": ["bug"] }],
@@ -81,18 +80,19 @@ Output includes analysis stats (duration, tokens, cost):
 
 ### `tix create`
 
-Create issues directly from JSON or flags.
+Create issues directly from JSON or flags. Checks for duplicates before creating.
 
 ```bash
 tix parse notes.txt | jq '.tickets' | tix create         # pipe from parse
 tix create tickets.json                                    # from JSON file
 tix create --title "Fix bug" --priority 2 --labels "bug"   # from flags
 tix create --target github                                 # target GitHub
+tix create --skip-dedup                                    # skip duplicate check
 ```
 
 ### `tix project`
 
-Manage projects with per-project output targets and context.
+Manage projects with per-project output targets and context. Project context (description, stack, philosophy) is injected into the AI prompt for project-specific ticket generation.
 
 ```bash
 tix project create my-app
@@ -126,40 +126,49 @@ tix dashboard --port 3000
 
 ## Dashboard
 
-The web UI provides a human-friendly interface:
+The web UI at `tix dashboard`:
 
 - Paste text or upload files (.txt, .md, .srt, .vtt, .csv)
-- Real-time analysis progress with token count and cancel button
+- Elapsed time counter during analysis with cancel button
 - Edit tickets (title, description, priority, labels) before creating
 - Project selector with context editor
 - Target selector (Linear / GitHub)
 - History with creation status tracking
 
+## Duplicate Checking
+
+Before creating issues, tix automatically checks for duplicates:
+
+- **GitHub target** → fetches open issues via `gh` CLI
+- **Linear target** → fetches active issues via GraphQL API
+- Matches by title similarity (substring match + word overlap)
+- Duplicates are skipped with a warning
+- Use `--skip-dedup` to bypass
+
 ## Integration Backends
 
-| Integration | CLI backend | API backend |
-|------------|-------------|-------------|
-| Claude (parsing) | `claude` CLI | — |
-| GitHub (issues) | `gh` CLI (auto-detected) | REST API via `GITHUB_TOKEN` |
-| Linear (issues) | `lin` CLI (auto-detected) | GraphQL API via `LINEAR_API_KEY` |
+| Integration | Backend |
+|------------|---------|
+| Claude (parsing) | `claude` CLI subprocess |
+| GitHub (issues) | `gh` CLI (preferred) or REST API via `GITHUB_TOKEN` |
+| Linear (issues) | GraphQL API via `LINEAR_API_KEY` |
 
 ### Environment Variables
 
 | Variable | Required for | Description |
 |----------|-------------|-------------|
-| `LINEAR_API_KEY` | Linear (API mode) | [Linear API key](https://linear.app/settings/account/security) |
-| `LINEAR_TEAM_ID` | Linear (API mode) | Linear team UUID (or set per-project) |
+| `LINEAR_API_KEY` | Linear issues | [Linear API key](https://linear.app/settings/account/security) |
+| `LINEAR_TEAM_ID` | Linear issues | Linear team UUID (or set per-project) |
 | `GITHUB_TOKEN` | GitHub (API mode) | [GitHub token](https://github.com/settings/tokens) (not needed with `gh` CLI) |
-| `GITHUB_REPO` | GitHub | `owner/repo` (or per-project, or auto-detected) |
+| `GITHUB_REPO` | GitHub | `owner/repo` (or per-project, or auto-detected from git) |
 
 Credentials load from `.env` (local) or `~/.tix/.env` (global).
 
 ## Claude Code Skill
 
-tix is available as a [Claude Code skill](https://skills.sh). Install it to let Claude Code use tix automatically when you ask to create tickets.
+tix is available as a Claude Code skill. Install it to let Claude Code use tix automatically when you ask to create tickets.
 
 ```bash
-# Install the skill
 npx skills add junu0723/tix -g -y
 
 # Then just ask Claude Code:

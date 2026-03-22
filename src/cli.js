@@ -86,7 +86,7 @@ async function confirm(question) {
 program
   .name('tix')
   .description('tix — AI-powered CLI that turns any text into actionable tickets.\n\nDesigned for AI agents. All commands output JSON to stdout, status to stderr.\nSupports Linear and GitHub as output targets.\n\nQuick start:\n  tix setup --linear-api-key KEY --linear-team-id ID\n  tix project create my-project\n  tix parse meeting.txt --pretty\n  tix parse meeting.txt --push')
-  .version('0.1.2');
+  .version('0.2.0');
 
 program
   .command('setup')
