@@ -1,4 +1,4 @@
-node bin/tix.js parse --text '맞아요. UI는 있는 것만으로도 충분해요.
+맞아요. UI는 있는 것만으로도 충분해요.
 
 지금 tix의 진짜 가치는 CLI + SKILL.md 쪽이에요. 정리하면:
 
@@ -34,22 +34,4 @@ tix/SKILL.md (Claude Code에서 사용 가능)
 
 지금 당장 3번 해볼 수 있어요. 이 대화 내용 텍스트로 저장해서 `tix parse --push` 돌리면 오늘 나온 아이디어들이 Linear에 들어가요.
 
-해볼까요, 아니면 SKILL.md를 ezq-workspace에 실제 연결하는 거 먼저 할까요?'
-Using project: tix
-Analyzing...
-<anonymous_script>:10
-    "description": "Create a tix project for ezq-workspace with GitHub repo, description, and tech stack so that tix can auto-load ROADMAP.md and GitHub Issues context when generating tickets.\n\n### Command\n
-
-SyntaxError: Unterminated string in JSON at position 1089 (line 10 column 210)
-    at JSON.parse (<anonymous>)
-    at extractTickets (file:///Users/junu/dev/relay-cli/src/parser.js:114:15)
-    at parseTranscript (file:///Users/junu/dev/relay-cli/src/parser.js:127:19)
-    at Command.<anonymous> (file:///Users/junu/dev/relay-cli/src/cli.js:233:32)
-    at Command.listener [as _actionHandler] (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:552:17)
-    at /Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1586:14
-    at Command._chainOrCall (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1470:12)
-    at Command._parseCommand (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1585:27)
-    at /Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1349:27
-    at Command._chainOrCall (/Users/junu/dev/relay-cli/node_modules/commander/lib/command.js:1470:12)
-
-Node.js v25.8.1
+해볼까요, 아니면 SKILL.md를 ezq-workspace에 실제 연결하는 거 먼저 할까요?

@@ -107,14 +107,11 @@ function buildPrompt(text, project) {
 }
 
 function extractTickets(raw) {
-  if (raw.includes('```')) {
-    const match = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-    if (match) raw = match[1].trim();
-  }
-  if (!raw.startsWith('[')) {
-    const start = raw.indexOf('[');
-    const end = raw.lastIndexOf(']');
-    if (start !== -1 && end !== -1) raw = raw.slice(start, end + 1);
+  // Find the JSON array directly — more robust than stripping code fences
+  const start = raw.indexOf('[');
+  const end = raw.lastIndexOf(']');
+  if (start !== -1 && end !== -1) {
+    raw = raw.slice(start, end + 1);
   }
   return JSON.parse(raw);
 }
